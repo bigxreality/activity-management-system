@@ -241,6 +241,14 @@
             <select id="f_category" required></select>
           </div>
           <div class="field">
+            <label>費用類型（自動帶出）</label>
+            <div class="field-computed" id="f_expenseType">—</div>
+          </div>
+          <div class="field" id="f_applicant_field" style="display:none;">
+            <label>申請人（代墊費用的同事） <span class="req">*</span></label>
+            <select id="f_applicant"></select>
+          </div>
+          <div class="field">
             <label>項目 <span class="req">*</span></label>
             <input type="text" id="f_item" placeholder="例如：主視覺輸出" required>
           </div>
@@ -325,6 +333,18 @@
             <input type="number" id="e_budget" min="0" step="1" placeholder="0" required>
           </div>
           <div class="field">
+            <label>國家</label>
+            <select id="e_country"></select>
+          </div>
+          <div class="field">
+            <label>年度</label>
+            <input type="number" id="e_year" step="1" placeholder="例如：2026">
+          </div>
+          <div class="field span-2">
+            <label>展覽系列</label>
+            <input type="text" id="e_series" placeholder="例如：台北國際發明展（用來把同一個展覽跨年度串起來）">
+          </div>
+          <div class="field span-2">
             <label>備註</label>
             <input type="text" id="e_note" placeholder="選填">
           </div>
@@ -381,8 +401,21 @@
   "use strict";
 
   // ---------------- Constants ----------------
-  var CATEGORIES = ["攤位費","裝潢","設計","印刷","設備租借","運輸","住宿","交通","餐費","人員","保險","行銷宣傳","贈品","雜支"];
+  // 費用類別分成「個人費用」（員工代墊、事後跑差旅報告單核銷，一定要綁申請人）
+  // 與「展覽公用費用」（跟展覽本身綁定，跑請款單），選好類別後費用類型自動帶出
+  var CATEGORY_GROUPS = [
+    { type:'個人', label:'個人費用', items:["機票","交通","住宿","餐費","交際費","人員"] },
+    { type:'公用', label:'展覽公用費用', items:["攤位費","裝潢","設計","印刷","設備租借","運輸","保險","行銷宣傳","贈品","雜支"] }
+  ];
+  var CATEGORIES = CATEGORY_GROUPS.reduce(function(acc,g){ return acc.concat(g.items); }, []);
+  var CATEGORY_TYPE = {};
+  CATEGORY_GROUPS.forEach(function(g){ g.items.forEach(function(c){ CATEGORY_TYPE[c] = g.type; }); });
   var PAYMENTS = ["匯款","公司卡","現金","其他"];
+  // 五位使用者姓名，申請人下拉選單用（跟權限系統批次的名單一致）
+  var USERS = ["Eric","Grace","Lina","Albert","Hanson"];
+  // 常見國家清單，展覽總覽的「國家」下拉選單用
+  var COUNTRIES = ["台灣","中國","香港","澳門","日本","韓國","新加坡","馬來西亞","泰國","越南","印尼","菲律賓","印度",
+    "美國","加拿大","英國","德國","法國","義大利","荷蘭","西班牙","瑞士","澳洲","紐西蘭","阿聯","沙烏地阿拉伯","其他"];
   // 幣別：亞洲各國幣別 + 美金/歐元/英鎊/澳幣，分區列出方便找
   // 只列台灣銀行牌告匯率實際有報價的幣別（共 19 種）+ 新台幣本身
   var CURRENCY_GROUPS = [
@@ -510,6 +543,23 @@
       var o = document.createElement('option');
       o.value = v; o.textContent = v;
       sel.appendChild(o);
+    });
+  }
+
+  function fillCategorySelect(sel){
+    sel.innerHTML = '';
+    var ph = document.createElement('option');
+    ph.value=''; ph.textContent='請選擇類別'; ph.disabled=true; ph.selected=true;
+    sel.appendChild(ph);
+    CATEGORY_GROUPS.forEach(function(group){
+      var og = document.createElement('optgroup');
+      og.label = group.label;
+      group.items.forEach(function(cat){
+        var o = document.createElement('option');
+        o.value = cat; o.textContent = cat;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
     });
   }
 
@@ -653,6 +703,22 @@
     }
     updateTwdPreview();
   }
+  function updateExpenseTypeState(){
+    var category = document.getElementById('f_category').value;
+    var type = CATEGORY_TYPE[category] || '';
+    document.getElementById('f_expenseType').textContent = type || '—';
+    var applicantField = document.getElementById('f_applicant_field');
+    var applicantSel = document.getElementById('f_applicant');
+    if(type === '個人'){
+      applicantField.style.display = '';
+      applicantSel.required = true;
+    } else {
+      applicantField.style.display = 'none';
+      applicantSel.required = false;
+      applicantSel.value = '';
+    }
+  }
+  document.getElementById('f_category').addEventListener('change', updateExpenseTypeState);
   document.getElementById('f_currency').addEventListener('change', updateRateButtonState);
   // 換日期時，如果目前幣別台銀有牌價，也一併重新抓當天匯率
   document.getElementById('f_date').addEventListener('change', function(){
@@ -691,6 +757,7 @@
     elDate.value = new Date().toISOString().slice(0,10);
     document.getElementById('f_currency').value = 'TWD';
     updateRateButtonState();
+    updateExpenseTypeState();
     editingExpenseId = null;
     document.getElementById('expenseSubmitBtn').textContent = '新增費用';
     document.getElementById('expenseCancelBtn').style.display = 'none';
@@ -706,12 +773,16 @@
     var amount = parseFloat(document.getElementById('f_amount').value);
     var rate = parseFloat(document.getElementById('f_rate').value);
     if(!(amount >= 0) || !(rate >= 0)){ msg.textContent = '金額與匯率需為正數'; return; }
+    var category = document.getElementById('f_category').value;
+    var expenseType = CATEGORY_TYPE[category] || '';
+    var applicant = document.getElementById('f_applicant').value;
+    if(expenseType === '個人' && !applicant){ msg.textContent = '個人費用請選擇申請人'; return; }
 
     var payload = {
       id: editingExpenseId,
       exhibitionName: exhibitionName,
       date: document.getElementById('f_date').value,
-      category: document.getElementById('f_category').value,
+      category: category,
       item: document.getElementById('f_item').value.trim(),
       vendor: document.getElementById('f_vendor').value.trim(),
       currency: document.getElementById('f_currency').value,
@@ -719,7 +790,8 @@
       rate: rate,
       payment: document.getElementById('f_payment').value,
       invoice: document.getElementById('f_invoice').value.trim(),
-      note: document.getElementById('f_note').value.trim()
+      note: document.getElementById('f_note').value.trim(),
+      applicant: expenseType === '個人' ? applicant : ''
     };
 
     showLoading(true);
@@ -747,6 +819,8 @@
     document.getElementById('f_exhibition').value = rec.exhibitionName;
     document.getElementById('f_date').value = rec.date;
     document.getElementById('f_category').value = rec.category;
+    updateExpenseTypeState();
+    document.getElementById('f_applicant').value = rec.applicant || '';
     document.getElementById('f_item').value = rec.item;
     document.getElementById('f_vendor').value = rec.vendor;
     suppressAutoFetch = true;
@@ -794,7 +868,7 @@
     }
     var total = rows.reduce(function(s,r){ return s + (Number(r.twd)||0); }, 0);
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th>展覽</th><th>日期</th><th>類別</th><th>項目</th><th>廠商</th>' +
+      '<th>展覽</th><th>日期</th><th>類別</th><th>類型</th><th>申請人</th><th>項目</th><th>廠商</th>' +
       '<th class="num">原幣金額</th><th class="num">匯率</th><th class="num">台幣金額</th>' +
       '<th>付款方式</th><th>發票</th><th>備註</th><th></th></tr></thead><tbody>';
     rows.forEach(function(r){
@@ -802,6 +876,8 @@
         '<td>' + escapeHtml(r.exhibitionName) + '</td>' +
         '<td class="mono">' + escapeHtml(r.date) + '</td>' +
         '<td><span class="tag" style="color:' + categoryColor(r.category) + ';">' + escapeHtml(r.category) + '</span></td>' +
+        '<td>' + escapeHtml(r.expenseType||'—') + '</td>' +
+        '<td>' + escapeHtml(r.applicant||'—') + '</td>' +
         '<td>' + escapeHtml(r.item) + '</td>' +
         '<td>' + escapeHtml(r.vendor||'—') + '</td>' +
         '<td class="num">' + fmtNum(r.amount) + ' ' + escapeHtml(r.currency) + '</td>' +
@@ -825,10 +901,10 @@
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var filterName = document.getElementById('expenseFilter').value;
     var rows = state.expenses.filter(function(x){ return !filterName || x.exhibitionName === filterName; });
-    var header = ['展覽','日期','費用類別','項目','廠商','幣別','原幣金額','匯率','台幣金額','付款方式','發票','備註'];
+    var header = ['展覽','日期','費用類別','費用類型','申請人','項目','廠商','幣別','原幣金額','匯率','台幣金額','付款方式','發票','備註'];
     var lines = [header.join(',')];
     rows.forEach(function(r){
-      var line = [r.exhibitionName, r.date, r.category, r.item, r.vendor, r.currency, r.amount, r.rate, r.twd, r.payment, r.invoice, r.note]
+      var line = [r.exhibitionName, r.date, r.category, r.expenseType, r.applicant, r.item, r.vendor, r.currency, r.amount, r.rate, r.twd, r.payment, r.invoice, r.note]
         .map(function(v){ v = (v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(v) ? '"' + v + '"' : v; });
       lines.push(line.join(','));
     });
@@ -859,7 +935,13 @@
     if(!editingExhibitionId && state.exhibitions.some(function(x){return x.name===name;})){
       msg.textContent = '已存在相同名稱的展覽'; return;
     }
-    var payload = { id: editingExhibitionId, name: name, budget: budget, note: document.getElementById('e_note').value.trim() };
+    var payload = {
+      id: editingExhibitionId, name: name, budget: budget,
+      note: document.getElementById('e_note').value.trim(),
+      country: document.getElementById('e_country').value,
+      year: document.getElementById('e_year').value ? parseInt(document.getElementById('e_year').value, 10) : '',
+      series: document.getElementById('e_series').value.trim()
+    };
 
     showLoading(true);
     try{
@@ -886,6 +968,9 @@
     document.getElementById('e_name').value = rec.name;
     document.getElementById('e_budget').value = rec.budget;
     document.getElementById('e_note').value = rec.note;
+    document.getElementById('e_country').value = rec.country || '';
+    document.getElementById('e_year').value = rec.year || '';
+    document.getElementById('e_series').value = rec.series || '';
     document.getElementById('exhibitionSubmitBtn').textContent = '更新展覽';
     document.getElementById('exhibitionCancelBtn').style.display = 'inline-block';
     document.getElementById('exhibitionFormCard').scrollIntoView({behavior:'smooth', block:'start'});
@@ -916,7 +1001,7 @@
       return;
     }
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th>展覽名稱</th><th class="num">預算</th><th class="num">總成本</th><th class="num">差異</th><th>備註</th><th></th></tr></thead><tbody>';
+      '<th>展覽名稱</th><th>國家</th><th>年度</th><th>展覽系列</th><th class="num">預算</th><th class="num">總成本</th><th class="num">差異</th><th>備註</th><th></th></tr></thead><tbody>';
     state.exhibitions.forEach(function(ex){
       var cost = Number(ex.cost)||0;
       var diff = Number(ex.diff)||0;
@@ -924,6 +1009,9 @@
       var diffSign = diff < 0 ? '−NT$ ' + fmtInt(Math.abs(diff)) : '+NT$ ' + fmtInt(diff);
       html += '<tr>' +
         '<td style="font-weight:600;">' + escapeHtml(ex.name) + '</td>' +
+        '<td>' + escapeHtml(ex.country || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(ex.year || '—') + '</td>' +
+        '<td>' + escapeHtml(ex.series || '—') + '</td>' +
         '<td class="num">NT$ ' + fmtInt(ex.budget) + '</td>' +
         '<td class="num">NT$ ' + fmtInt(cost) + '</td>' +
         '<td class="num ' + diffClass + '">' + diffSign + '</td>' +
@@ -1034,11 +1122,14 @@
 
   // ---------------- Init ----------------
   async function init(){
-    fillSelect(document.getElementById('f_category'), CATEGORIES, '請選擇類別');
+    fillCategorySelect(document.getElementById('f_category'));
+    fillSelect(document.getElementById('f_applicant'), USERS, '請選擇申請人');
     fillCurrencySelect(document.getElementById('f_currency'));
     document.getElementById('f_currency').value = 'TWD';
     fillSelect(document.getElementById('f_payment'), PAYMENTS, '請選擇付款方式');
+    fillSelect(document.getElementById('e_country'), COUNTRIES, '請選擇國家（選填）');
     updateRateButtonState();
+    updateExpenseTypeState();
 
     try{ appsScriptUrl = localStorage.getItem(LS_URL_KEY) || DEFAULT_APPS_SCRIPT_URL || ''; }
     catch(e){ appsScriptUrl = DEFAULT_APPS_SCRIPT_URL || ''; }
