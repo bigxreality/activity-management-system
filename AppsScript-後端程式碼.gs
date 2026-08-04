@@ -25,6 +25,26 @@
 var SHEET_EXPENSE = '費用明細';
 var SHEET_EXHIBITION = '展覽總覽';
 
+// 費用類別 -> 費用類型（個人/公用）對照表，不要交給前端自己送，後端統一判斷才不會被繞過
+var CATEGORY_TYPE = {
+  '機票': '個人', '交通': '個人', '住宿': '個人', '餐費': '個人', '交際費': '個人', '人員': '個人',
+  '攤位費': '公用', '裝潢': '公用', '設計': '公用', '印刷': '公用', '設備租借': '公用',
+  '運輸': '公用', '保險': '公用', '行銷宣傳': '公用', '贈品': '公用', '雜支': '公用'
+};
+function getCategoryType(category) {
+  return CATEGORY_TYPE[category] || '';
+}
+
+// 欄位固定不動：既有欄位保持原本的欄位編號，新欄位一律加在原本欄位「之後」，
+// 這樣舊資料、既有公式、ID 對照欄位都不用搬動，舊資料的新欄位讀出來自然是空值。
+var EXPENSE_HEADERS = [
+  '展覽', '日期', '費用類別', '項目', '廠商', '幣別', '原幣金額',
+  '匯率', '台幣金額', '付款方式', '發票', '備註', 'ID', '費用類型', '申請人'
+];
+var EXHIBITION_HEADERS = [
+  '展覽名稱', '預算', '總成本', '差異', '備註', 'ID', '國家', '年度', '展覽系列'
+];
+
 // ---------- 初始化 ----------
 function setupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -32,27 +52,33 @@ function setupSheets() {
   var exp = ss.getSheetByName(SHEET_EXPENSE) || ss.insertSheet(SHEET_EXPENSE);
   if (exp.getRange(1, 1).getValue() !== '展覽') {
     exp.clear();
-    exp.getRange(1, 1, 1, 13).setValues([[
-      '展覽', '日期', '費用類別', '項目', '廠商', '幣別', '原幣金額',
-      '匯率', '台幣金額', '付款方式', '發票', '備註', 'ID'
-    ]]);
+    exp.getRange(1, 1, 1, EXPENSE_HEADERS.length).setValues([EXPENSE_HEADERS]);
     exp.setFrozenRows(1);
-    exp.getRange('A1:M1').setFontWeight('bold');
-    exp.setColumnWidth(13, 30);
-    exp.hideColumns(13);
+    exp.getRange(1, 1, 1, EXPENSE_HEADERS.length).setFontWeight('bold');
+  } else if (exp.getLastColumn() < EXPENSE_HEADERS.length) {
+    // 舊分頁只補上缺少的欄位標題，不動既有資料的欄位位置
+    var expStart = exp.getLastColumn() + 1;
+    var expMissing = EXPENSE_HEADERS.slice(exp.getLastColumn());
+    exp.getRange(1, expStart, 1, expMissing.length).setValues([expMissing]);
+    exp.getRange(1, expStart, 1, expMissing.length).setFontWeight('bold');
   }
+  exp.setColumnWidth(13, 30);
+  exp.hideColumns(13);
 
   var ex = ss.getSheetByName(SHEET_EXHIBITION) || ss.insertSheet(SHEET_EXHIBITION);
   if (ex.getRange(1, 1).getValue() !== '展覽名稱') {
     ex.clear();
-    ex.getRange(1, 1, 1, 6).setValues([[
-      '展覽名稱', '預算', '總成本', '差異', '備註', 'ID'
-    ]]);
+    ex.getRange(1, 1, 1, EXHIBITION_HEADERS.length).setValues([EXHIBITION_HEADERS]);
     ex.setFrozenRows(1);
-    ex.getRange('A1:F1').setFontWeight('bold');
-    ex.setColumnWidth(6, 30);
-    ex.hideColumns(6);
+    ex.getRange(1, 1, 1, EXHIBITION_HEADERS.length).setFontWeight('bold');
+  } else if (ex.getLastColumn() < EXHIBITION_HEADERS.length) {
+    var exStart = ex.getLastColumn() + 1;
+    var exMissing = EXHIBITION_HEADERS.slice(ex.getLastColumn());
+    ex.getRange(1, exStart, 1, exMissing.length).setValues([exMissing]);
+    ex.getRange(1, exStart, 1, exMissing.length).setFontWeight('bold');
   }
+  ex.setColumnWidth(6, 30);
+  ex.hideColumns(6);
 }
 
 // ---------- 入口 ----------
@@ -106,14 +132,17 @@ function getAllData() {
   var expSheet = getSheet(SHEET_EXPENSE);
 
   var exValues = exSheet.getLastRow() > 1
-    ? exSheet.getRange(2, 1, exSheet.getLastRow() - 1, 6).getValues() : [];
+    ? exSheet.getRange(2, 1, exSheet.getLastRow() - 1, EXHIBITION_HEADERS.length).getValues() : [];
   var expValues = expSheet.getLastRow() > 1
-    ? expSheet.getRange(2, 1, expSheet.getLastRow() - 1, 13).getValues() : [];
+    ? expSheet.getRange(2, 1, expSheet.getLastRow() - 1, EXPENSE_HEADERS.length).getValues() : [];
 
   var exhibitions = exValues
     .filter(function (r) { return r[0] !== ''; })
     .map(function (r) {
-      return { name: r[0], budget: r[1], cost: r[2] || 0, diff: r[3] || 0, note: r[4], id: r[5] };
+      return {
+        name: r[0], budget: r[1], cost: r[2] || 0, diff: r[3] || 0, note: r[4], id: r[5],
+        country: r[6] || '', year: r[7] || '', series: r[8] || ''
+      };
     });
 
   var expenses = expValues
@@ -122,7 +151,8 @@ function getAllData() {
       return {
         id: r[12], exhibitionName: r[0], date: fmtDate(r[1]), category: r[2], item: r[3],
         vendor: r[4], currency: r[5], amount: r[6], rate: r[7], twd: r[8],
-        payment: r[9], invoice: r[10], note: r[11]
+        payment: r[9], invoice: r[10], note: r[11],
+        expenseType: r[13] || '', applicant: r[14] || ''
       };
     });
 
@@ -155,12 +185,14 @@ function addExpense(p) {
   var sheet = getSheet(SHEET_EXPENSE);
   var row = sheet.getLastRow() + 1;
   var id = makeId('x');
+  var expenseType = getCategoryType(p.category);
   sheet.getRange(row, 1, 1, 8).setValues([[
     p.exhibitionName, p.date, p.category, p.item, p.vendor, p.currency, p.amount, p.rate
   ]]);
   sheet.getRange(row, 9).setFormula('=IF(OR(G' + row + '="",H' + row + '="")," ",G' + row + '*H' + row + ')');
   sheet.getRange(row, 10, 1, 3).setValues([[p.payment, p.invoice, p.note]]);
   sheet.getRange(row, 13).setValue(id);
+  sheet.getRange(row, 14, 1, 2).setValues([[expenseType, expenseType === '個人' ? (p.applicant || '') : '']]);
   return { id: id };
 }
 
@@ -168,11 +200,13 @@ function updateExpense(p) {
   var sheet = getSheet(SHEET_EXPENSE);
   var row = findRowById(sheet, 13, p.id);
   if (row < 0) return { error: '找不到這筆費用' };
+  var expenseType = getCategoryType(p.category);
   sheet.getRange(row, 1, 1, 8).setValues([[
     p.exhibitionName, p.date, p.category, p.item, p.vendor, p.currency, p.amount, p.rate
   ]]);
   sheet.getRange(row, 9).setFormula('=IF(OR(G' + row + '="",H' + row + '="")," ",G' + row + '*H' + row + ')');
   sheet.getRange(row, 10, 1, 3).setValues([[p.payment, p.invoice, p.note]]);
+  sheet.getRange(row, 14, 1, 2).setValues([[expenseType, expenseType === '個人' ? (p.applicant || '') : '']]);
   return { id: p.id };
 }
 
@@ -198,6 +232,7 @@ function addExhibition(p) {
   );
   sheet.getRange(row, 5).setValue(p.note || '');
   sheet.getRange(row, 6).setValue(id);
+  sheet.getRange(row, 7, 1, 3).setValues([[p.country || '', p.year || '', p.series || '']]);
   return { id: id };
 }
 
@@ -208,6 +243,7 @@ function updateExhibition(p) {
   var oldName = sheet.getRange(row, 1).getValue();
   sheet.getRange(row, 1, 1, 2).setValues([[p.name, p.budget]]);
   sheet.getRange(row, 5).setValue(p.note || '');
+  sheet.getRange(row, 7, 1, 3).setValues([[p.country || '', p.year || '', p.series || '']]);
   // 展覽改名的話，一併更新費用明細裡對應的展覽名稱，避免加總斷掉
   if (oldName !== p.name) {
     var expSheet = getSheet(SHEET_EXPENSE);
