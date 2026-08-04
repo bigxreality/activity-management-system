@@ -9,21 +9,46 @@
  * 3. 把這個檔案的全部內容貼進去，取代預設的程式碼，Ctrl+S 存檔
  * 4. 上方工具列選擇函式「setupSheets」，按執行 ▶（第一次執行會要求授權，
  *    選你的 Google 帳號 > 允許）
- * 5. 回到試算表確認多了「費用明細」「展覽總覽」兩個分頁
+ * 5. 回到試算表確認多了「費用明細」「展覽總覽」「使用者權限」三個分頁，
+ *    「使用者權限」分頁會自動帶入五筆定案的人員清單
  * 6. 回 Apps Script，右上角「部署」>「新增部署作業」
  *    - 類型選「網頁應用程式」
- *    - 執行身份：我
- *    - 具有存取權的使用者：任何人
+ *    - 執行身份：**使用者本人**（不是「我」，這樣後端才能用
+ *      Session.getActiveUser().getEmail() 拿到實際登入者）
+ *    - 具有存取權的使用者：**知道連結的使用者（限 Google 帳戶）**
  *    - 按「部署」，複製產生的網址（結尾是 /exec）
+ *    - 同事第一次打開網頁應用程式網址時，Google 會跳出「這個應用程式
+ *      需要您的授權」畫面，屬正常現象，同意即可
  * 7. 把這個網址貼到 HTML 網頁裡右上角「設定」欄位（或請 Claude 幫你把網址
  *    直接寫死在 HTML 裡，同事就不用自己貼一次）
  *
  * 之後如果修改這份程式碼，要「部署」>「管理部署作業」> 編輯 > 新版本，
  * 網址才會套用最新程式碼。
+ *
+ * 權限系統：
+ * - 「使用者權限」分頁（Email / 姓名 / 角色）決定誰能用、能做什麼，角色只有
+ *   管理員 / 編輯者 / 檢視者三種。不在清單裡的 Google 帳號一律被拒絕。
+ * - 權限判斷全部寫在後端（這個檔案），前端只是把按鈕隱藏起來做體驗優化，
+ *   不是真正的防護——就算有人用瀏覽器工具繞過前端限制直接打 API，後端
+ *   還是會用 Session.getActiveUser().getEmail() 查角色，擋掉不該做的操作。
+ * - 管理員可以在前端「使用者管理」畫面直接增刪使用者、改角色，不用手動改
+ *   Google Sheet。
  */
 
 var SHEET_EXPENSE = '費用明細';
 var SHEET_EXHIBITION = '展覽總覽';
+var SHEET_USERS = '使用者權限';
+
+var ROLES = ['管理員', '編輯者', '檢視者'];
+var USER_HEADERS = ['Email', '姓名', '角色', 'ID'];
+// 已跟業主確認過的定案初始名單，第一次建立「使用者權限」分頁時自動帶入
+var DEFAULT_USERS = [
+  ['eric.chen@gptt.com.tw', 'Eric', '管理員'],
+  ['grace@gptt.com.tw', 'Grace', '編輯者'],
+  ['lina.liu@gptt.com.tw', 'Lina', '編輯者'],
+  ['albert.chen@gptt.com.tw', 'Albert', '編輯者'],
+  ['hanson@gptt.com.tw', 'Hanson', '檢視者']
+];
 
 // 費用類別 -> 費用類型（個人/公用）對照表，不要交給前端自己送，後端統一判斷才不會被繞過
 var CATEGORY_TYPE = {
@@ -79,15 +104,77 @@ function setupSheets() {
   }
   ex.setColumnWidth(6, 30);
   ex.hideColumns(6);
+
+  var users = ss.getSheetByName(SHEET_USERS) || ss.insertSheet(SHEET_USERS);
+  if (users.getRange(1, 1).getValue() !== 'Email') {
+    users.clear();
+    users.getRange(1, 1, 1, USER_HEADERS.length).setValues([USER_HEADERS]);
+    users.setFrozenRows(1);
+    users.getRange(1, 1, 1, USER_HEADERS.length).setFontWeight('bold');
+    // 分頁是新建的，帶入定案的初始名單
+    var initRows = DEFAULT_USERS.map(function (u) { return [u[0], u[1], u[2], makeId('u')]; });
+    users.getRange(2, 1, initRows.length, USER_HEADERS.length).setValues(initRows);
+  }
+  users.setColumnWidth(4, 30);
+  users.hideColumns(4);
+}
+
+// ---------- 權限判斷 ----------
+// 管理使用者權限清單的動作，編輯者不能碰，只有管理員可以
+var USER_MANAGEMENT_ACTIONS = ['addUser', 'updateUser', 'deleteUser'];
+
+function getCurrentUser() {
+  var email = Session.getActiveUser().getEmail();
+  var role = email ? lookupRole(email) : '';
+  return { email: email || '', role: role };
+}
+
+function lookupRole(email) {
+  var sheet = getSheet(SHEET_USERS);
+  var last = sheet.getLastRow();
+  if (last < 2) return '';
+  var values = sheet.getRange(2, 1, last - 1, 3).getValues(); // Email, 姓名, 角色
+  var target = String(email).toLowerCase().trim();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0]).toLowerCase().trim() === target) return values[i][2];
+  }
+  return '';
+}
+
+// action：本次呼叫的操作名稱；isPost：是不是寫入類的操作（新增/編輯/刪除/匯出等）
+function requireAccess(action, isPost) {
+  var user = getCurrentUser();
+  if (!user.email) {
+    return { ok: false, error: '無法取得您的 Google 帳號身份，請確認已用 Google 帳號登入後再開啟這個網址' };
+  }
+  if (!user.role || ROLES.indexOf(user.role) < 0) {
+    return { ok: false, error: '您的帳號（' + user.email + '）不在使用者權限清單中，請聯絡管理員新增權限' };
+  }
+  if (isPost && user.role === '檢視者') {
+    return { ok: false, error: '您是檢視者，沒有新增/編輯/刪除/匯出的權限' };
+  }
+  if (USER_MANAGEMENT_ACTIONS.indexOf(action) >= 0 && user.role !== '管理員') {
+    return { ok: false, error: '只有管理員可以管理使用者權限清單' };
+  }
+  return { ok: true, user: user };
 }
 
 // ---------- 入口 ----------
 function doGet(e) {
   var action = (e.parameter.action || 'list');
+  var access = requireAccess(action, false);
+  if (!access.ok) return jsonOut({ error: access.error });
+
   if (action === 'rate') {
     return jsonOut(getBotRate(e.parameter.date, e.parameter.currency));
   }
-  return jsonOut(getAllData());
+  if (action === 'listUsers') {
+    if (access.user.role !== '管理員') return jsonOut({ error: '只有管理員可以查看使用者權限清單' });
+    return jsonOut({ users: getAllUsers(), currentUser: access.user });
+  }
+  var data = getAllData();
+  data.currentUser = access.user;
+  return jsonOut(data);
 }
 
 function doPost(e) {
@@ -100,6 +187,12 @@ function doPost(e) {
   }
   var action = body.action;
   var p = body.payload || {};
+
+  var access = requireAccess(action, true);
+  if (!access.ok) {
+    return jsonOut({ result: { error: access.error }, error: access.error });
+  }
+
   var result;
   switch (action) {
     case 'addExpense':       result = addExpense(p); break;
@@ -108,11 +201,18 @@ function doPost(e) {
     case 'addExhibition':    result = addExhibition(p); break;
     case 'updateExhibition': result = updateExhibition(p); break;
     case 'deleteExhibition': result = deleteExhibition(p.name); break;
+    case 'addUser':          result = addUser(p); break;
+    case 'updateUser':       result = updateUser(p); break;
+    case 'deleteUser':       result = deleteUser(p.id, access.user); break;
     default: result = { error: '未知的操作：' + action };
   }
   // 每次寫入後直接回傳最新的完整資料，前端不用再多打一次
   var fresh = getAllData();
   fresh.result = result;
+  fresh.currentUser = access.user;
+  if (access.user.role === '管理員' && USER_MANAGEMENT_ACTIONS.indexOf(action) >= 0) {
+    fresh.users = getAllUsers();
+  }
   return jsonOut(fresh);
 }
 
@@ -284,6 +384,71 @@ function deleteExhibition(name) {
     }
   }
   return { error: '找不到這個展覽' };
+}
+
+// ---------- 使用者權限 CRUD ----------
+function getAllUsers() {
+  var sheet = getSheet(SHEET_USERS);
+  var last = sheet.getLastRow();
+  if (last < 2) return [];
+  var values = sheet.getRange(2, 1, last - 1, USER_HEADERS.length).getValues();
+  return values
+    .filter(function (r) { return r[0] !== ''; })
+    .map(function (r) { return { email: r[0], name: r[1], role: r[2], id: r[3] }; });
+}
+
+function countAdmins(excludingId) {
+  return getAllUsers().filter(function (u) {
+    return u.role === '管理員' && String(u.id) !== String(excludingId);
+  }).length;
+}
+
+function addUser(p) {
+  var email = String(p.email || '').trim();
+  var name = String(p.name || '').trim();
+  var role = p.role;
+  if (!email || !name) return { error: '請填寫 Email 與姓名' };
+  if (ROLES.indexOf(role) < 0) return { error: '角色只能是管理員、編輯者或檢視者' };
+  var existing = getAllUsers();
+  if (existing.some(function (u) { return u.email.toLowerCase() === email.toLowerCase(); })) {
+    return { error: '這個 Email 已經在使用者權限清單中了' };
+  }
+  var sheet = getSheet(SHEET_USERS);
+  var row = sheet.getLastRow() + 1;
+  var id = makeId('u');
+  sheet.getRange(row, 1, 1, 4).setValues([[email, name, role, id]]);
+  return { id: id };
+}
+
+function updateUser(p) {
+  var sheet = getSheet(SHEET_USERS);
+  var row = findRowById(sheet, 4, p.id);
+  if (row < 0) return { error: '找不到這個使用者' };
+  var email = String(p.email || '').trim();
+  var name = String(p.name || '').trim();
+  var role = p.role;
+  if (!email || !name) return { error: '請填寫 Email 與姓名' };
+  if (ROLES.indexOf(role) < 0) return { error: '角色只能是管理員、編輯者或檢視者' };
+  if (role !== '管理員' && countAdmins(p.id) === 0) {
+    return { error: '至少要保留一位管理員，無法把最後一位管理員改成其他角色' };
+  }
+  sheet.getRange(row, 1, 1, 3).setValues([[email, name, role]]);
+  return { id: p.id };
+}
+
+function deleteUser(id, currentUser) {
+  var sheet = getSheet(SHEET_USERS);
+  var row = findRowById(sheet, 4, id);
+  if (row < 0) return { error: '找不到這個使用者' };
+  var target = getAllUsers().filter(function (u) { return String(u.id) === String(id); })[0];
+  if (target && target.role === '管理員' && countAdmins(id) === 0) {
+    return { error: '至少要保留一位管理員，無法刪除最後一位管理員' };
+  }
+  if (currentUser && target && target.email.toLowerCase() === currentUser.email.toLowerCase()) {
+    return { error: '不能刪除自己的帳號，請請其他管理員操作' };
+  }
+  sheet.deleteRow(row);
+  return { deleted: id };
 }
 
 // ---------- 台灣銀行歷史匯率 ----------
