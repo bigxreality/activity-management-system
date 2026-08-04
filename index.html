@@ -181,7 +181,9 @@
       <button data-view="dashboard" class="active">儀表板</button>
       <button data-view="expenses">費用明細</button>
       <button data-view="exhibitions">展覽總覽</button>
+      <button data-view="users" id="navUsersBtn" style="display:none;">使用者管理</button>
     </nav>
+    <span id="currentUserLabel" style="color:#8B96A3;font-size:12px;font-family:var(--font-mono);margin-right:4px;"></span>
     <button class="gear-btn" id="openSettingsBtn"><span class="status-dot" id="statusDot"></span><span id="statusLabel">尚未連線</span></button>
   </div>
 </header>
@@ -360,6 +362,39 @@
     <div class="card"><div id="exhibitionTableWrap"></div></div>
   </section>
 
+  <!-- ============ USERS (管理員限定) ============ -->
+  <section id="view-users" class="view">
+    <h2 class="view-title">使用者管理</h2>
+    <p class="view-desc">管理誰可以使用這個系統、各自的角色。異動會直接寫回 Google Sheet 的「使用者權限」分頁，不用手動改表。</p>
+
+    <details class="card card-pad form-card" id="userFormCard" open>
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增使用者</summary>
+      <form id="userForm">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label>Email <span class="req">*</span></label>
+            <input type="email" id="u_email" placeholder="name@gptt.com.tw" required>
+          </div>
+          <div class="field">
+            <label>姓名 <span class="req">*</span></label>
+            <input type="text" id="u_name" required>
+          </div>
+          <div class="field">
+            <label>角色 <span class="req">*</span></label>
+            <select id="u_role" required></select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="userSubmitBtn">新增使用者</button>
+          <button type="button" class="btn btn-ghost" id="userCancelBtn" style="display:none;">取消編輯</button>
+          <span class="form-msg" id="userFormMsg"></span>
+        </div>
+      </form>
+    </details>
+
+    <div class="card"><div id="userTableWrap"></div></div>
+  </section>
+
 </main>
 
 <footer class="page-footer">
@@ -413,6 +448,8 @@
   var PAYMENTS = ["匯款","公司卡","現金","其他"];
   // 五位使用者姓名，申請人下拉選單用（跟權限系統批次的名單一致）
   var USERS = ["Eric","Grace","Lina","Albert","Hanson"];
+  // 權限角色：真正的權限判斷都在後端做，這裡只是給「使用者管理」表單的下拉選單用
+  var ROLES = ["管理員","編輯者","檢視者"];
   // 常見國家清單，展覽總覽的「國家」下拉選單用
   var COUNTRIES = ["台灣","中國","香港","澳門","日本","韓國","新加坡","馬來西亞","泰國","越南","印尼","菲律賓","印度",
     "美國","加拿大","英國","德國","法國","義大利","荷蘭","西班牙","瑞士","澳洲","紐西蘭","阿聯","沙烏地阿拉伯","其他"];
@@ -447,13 +484,36 @@
   }
 
   // ---------------- State ----------------
-  var state = { exhibitions: [], expenses: [] };
+  var state = { exhibitions: [], expenses: [], users: [], currentUser: null };
   var editingExpenseId = null;
   var editingExhibitionId = null;
+  var editingUserId = null;
   var suppressAutoFetch = false;
   var budgetChartInst = null;
   var categoryChartInst = null;
   var appsScriptUrl = '';
+
+  // 這裡只是體驗優化（隱藏檢視者用不到的按鈕），真正把關在後端 requireAccess()，
+  // 就算有人用瀏覽器工具把按鈕挖出來硬點，後端還是會擋掉寫入
+  function isViewer(){ return !!(state.currentUser && state.currentUser.role === '檢視者'); }
+  function isAdmin(){ return !!(state.currentUser && state.currentUser.role === '管理員'); }
+
+  function applyPermissionUI(){
+    var label = document.getElementById('currentUserLabel');
+    if(state.currentUser && state.currentUser.email){
+      label.textContent = state.currentUser.email + ' · ' + (state.currentUser.role || '無權限');
+    } else {
+      label.textContent = '';
+    }
+    document.getElementById('navUsersBtn').style.display = isAdmin() ? '' : 'none';
+    document.getElementById('expenseFormCard').style.display = isViewer() ? 'none' : '';
+    document.getElementById('exhibitionFormCard').style.display = isViewer() ? 'none' : '';
+    document.getElementById('exportCsvBtn').style.display = isViewer() ? 'none' : '';
+    // 如果目前停在使用者管理分頁，但角色已經不是管理員了（例如被別人改掉權限），切回儀表板
+    if(!isAdmin() && document.getElementById('view-users').classList.contains('active')){
+      document.querySelector('nav.tabs button[data-view="dashboard"]').click();
+    }
+  }
 
   function fmtInt(n){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits:0}).format(Math.round(n||0)); }
   function fmtNum(n, dp){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits: dp==null?2:dp}).format(n||0); }
@@ -528,6 +588,7 @@
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if(btn.dataset.view === 'dashboard') renderDashboard();
+      if(btn.dataset.view === 'users') loadUsers();
     });
   });
 
@@ -639,10 +700,13 @@
     showLoading(true);
     try{
       var data = await apiGet({ action: 'list' });
+      if(data.error) throw new Error(data.error);
       state.exhibitions = data.exhibitions || [];
       state.expenses = data.expenses || [];
+      state.currentUser = data.currentUser || null;
       try{ localStorage.setItem(LS_CACHE_KEY, JSON.stringify(state)); }catch(e){}
       setStatus('ok', '已連線');
+      applyPermissionUI();
       renderAll();
     }catch(err){
       setStatus('err', '連線失敗');
@@ -651,8 +715,9 @@
       banner.textContent = '無法讀取 Google Sheet：' + err.message + '（顯示的是最後一次成功讀取的快取資料）';
       try{
         var cached = localStorage.getItem(LS_CACHE_KEY);
-        if(cached){ var c = JSON.parse(cached); state.exhibitions = c.exhibitions||[]; state.expenses = c.expenses||[]; }
+        if(cached){ var c = JSON.parse(cached); state.exhibitions = c.exhibitions||[]; state.expenses = c.expenses||[]; state.currentUser = c.currentUser||null; }
       }catch(e){}
+      applyPermissionUI();
       renderAll();
     }finally{
       showLoading(false);
@@ -886,10 +951,10 @@
         '<td>' + escapeHtml(r.payment||'—') + '</td>' +
         '<td>' + escapeHtml(r.invoice||'—') + '</td>' +
         '<td>' + escapeHtml(r.note||'—') + '</td>' +
-        '<td><div class="row-actions">' +
+        '<td>' + (isViewer() ? '' : '<div class="row-actions">' +
           '<button class="icon-btn" data-edit="' + r.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-del="' + r.id + '">刪除</button>' +
-        '</div></td></tr>';
+        '</div>') + '</td></tr>';
     });
     html += '</tbody></table></div>';
     html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆</span><span>小計：NT$ ' + fmtInt(total) + '</span></div>';
@@ -1016,15 +1081,119 @@
         '<td class="num">NT$ ' + fmtInt(cost) + '</td>' +
         '<td class="num ' + diffClass + '">' + diffSign + '</td>' +
         '<td>' + escapeHtml(ex.note || '—') + '</td>' +
-        '<td><div class="row-actions">' +
+        '<td>' + (isViewer() ? '' : '<div class="row-actions">' +
           '<button class="icon-btn" data-eedit="' + ex.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-edel="' + ex.id + '">刪除</button>' +
-        '</div></td></tr>';
+        '</div>') + '</td></tr>';
     });
     html += '</tbody></table></div>';
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-eedit]').forEach(function(b){ b.addEventListener('click', function(){ editExhibition(b.dataset.eedit); }); });
     wrap.querySelectorAll('[data-edel]').forEach(function(b){ b.addEventListener('click', function(){ deleteExhibition(b.dataset.edel); }); });
+  }
+
+  // ---------------- Users（使用者管理，只有管理員看得到；後端也只放行管理員） ----------------
+  async function loadUsers(){
+    if(!isAdmin()) return;
+    showLoading(true);
+    try{
+      var data = await apiGet({ action: 'listUsers' });
+      if(data.error) throw new Error(data.error);
+      state.users = data.users || [];
+      renderUserTable();
+    }catch(err){
+      toast('讀取使用者清單失敗：' + err.message);
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  function resetUserForm(){
+    document.getElementById('userForm').reset();
+    editingUserId = null;
+    document.getElementById('userSubmitBtn').textContent = '新增使用者';
+    document.getElementById('userCancelBtn').style.display = 'none';
+    document.getElementById('userFormMsg').textContent = '';
+  }
+  document.getElementById('userCancelBtn').addEventListener('click', resetUserForm);
+
+  document.getElementById('userForm').addEventListener('submit', async function(ev){
+    ev.preventDefault();
+    var msg = document.getElementById('userFormMsg');
+    var email = document.getElementById('u_email').value.trim();
+    var name = document.getElementById('u_name').value.trim();
+    var role = document.getElementById('u_role').value;
+    if(!email || !name || !role){ msg.textContent = '請填寫 Email、姓名與角色'; return; }
+
+    var payload = { id: editingUserId, email: email, name: name, role: role };
+    showLoading(true);
+    try{
+      var data = editingUserId
+        ? await apiPost('updateUser', payload)
+        : await apiPost('addUser', payload);
+      state.users = data.users || state.users;
+      toast(editingUserId ? '已更新使用者' : '已新增使用者');
+      resetUserForm();
+      renderUserTable();
+    }catch(err){
+      msg.textContent = '儲存失敗：' + err.message;
+    }finally{
+      showLoading(false);
+    }
+  });
+
+  function editUser(id){
+    var rec = state.users.find(function(x){ return x.id === id; });
+    if(!rec) return;
+    editingUserId = id;
+    document.getElementById('userFormCard').open = true;
+    document.getElementById('u_email').value = rec.email;
+    document.getElementById('u_name').value = rec.name;
+    document.getElementById('u_role').value = rec.role;
+    document.getElementById('userSubmitBtn').textContent = '更新使用者';
+    document.getElementById('userCancelBtn').style.display = 'inline-block';
+    document.getElementById('userFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  async function deleteUserRow(id){
+    var rec = state.users.find(function(x){ return x.id === id; });
+    if(!rec) return;
+    if(!confirm('確定要刪除使用者「' + rec.name + '」（' + rec.email + '）嗎？')) return;
+    showLoading(true);
+    try{
+      var data = await apiPost('deleteUser', { id: id });
+      state.users = data.users || state.users;
+      renderUserTable();
+      toast('已刪除使用者');
+    }catch(err){
+      toast('刪除失敗：' + err.message);
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  function renderUserTable(){
+    var wrap = document.getElementById('userTableWrap');
+    if(state.users.length === 0){
+      wrap.innerHTML = '<div class="empty-state"><div class="big">👥</div>尚無使用者資料。</div>';
+      return;
+    }
+    var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
+      '<th>Email</th><th>姓名</th><th>角色</th><th></th></tr></thead><tbody>';
+    state.users.forEach(function(u){
+      html += '<tr>' +
+        '<td class="mono">' + escapeHtml(u.email) + '</td>' +
+        '<td>' + escapeHtml(u.name) + '</td>' +
+        '<td><span class="tag">' + escapeHtml(u.role) + '</span></td>' +
+        '<td><div class="row-actions">' +
+          '<button class="icon-btn" data-uedit="' + u.id + '">編輯</button>' +
+          '<button class="icon-btn danger" data-udel="' + u.id + '">刪除</button>' +
+        '</div></td></tr>';
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-uedit]').forEach(function(b){ b.addEventListener('click', function(){ editUser(b.dataset.uedit); }); });
+    wrap.querySelectorAll('[data-udel]').forEach(function(b){ b.addEventListener('click', function(){ deleteUserRow(b.dataset.udel); }); });
   }
 
   // ---------------- Dashboard ----------------
@@ -1128,15 +1297,17 @@
     document.getElementById('f_currency').value = 'TWD';
     fillSelect(document.getElementById('f_payment'), PAYMENTS, '請選擇付款方式');
     fillSelect(document.getElementById('e_country'), COUNTRIES, '請選擇國家（選填）');
+    fillSelect(document.getElementById('u_role'), ROLES, '請選擇角色');
     updateRateButtonState();
     updateExpenseTypeState();
+    applyPermissionUI(); // 還沒連線時先套用一次，預設當作沒有權限（隱藏管理員/寫入功能）
 
     try{ appsScriptUrl = localStorage.getItem(LS_URL_KEY) || DEFAULT_APPS_SCRIPT_URL || ''; }
     catch(e){ appsScriptUrl = DEFAULT_APPS_SCRIPT_URL || ''; }
 
     try{
       var cached = localStorage.getItem(LS_CACHE_KEY);
-      if(cached){ var c = JSON.parse(cached); state.exhibitions = c.exhibitions||[]; state.expenses = c.expenses||[]; }
+      if(cached){ var c = JSON.parse(cached); state.exhibitions = c.exhibitions||[]; state.expenses = c.expenses||[]; state.currentUser = c.currentUser||null; }
     }catch(e){}
 
     await loadState();
