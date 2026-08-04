@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>展覽費用管理系統</title>
+<title>活動管理系統</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#161F29">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -28,16 +32,26 @@
   button{font-family:inherit;cursor:pointer;}
   input,select,textarea{font-family:inherit;}
 
+  /* ---------------- Auth screen ---------------- */
+  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--navy);}
+  .auth-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:32px 30px;max-width:380px;width:100%;}
+  .auth-card .brand-mark{font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;color:var(--accent);border:1px solid var(--accent);padding:2px 7px;border-radius:4px;}
+  .auth-card h1{font-family:var(--font-display);font-size:20px;font-weight:600;margin:10px 0 22px;}
+  .auth-card .field{margin-bottom:14px;}
+  .auth-card p.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin-top:16px;line-height:1.6;}
+
   .topbar{background:var(--navy);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-bottom:3px solid var(--accent);}
   .brand{display:flex;align-items:baseline;gap:10px;padding:16px 0;}
   .brand-mark{font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;color:var(--accent);border:1px solid var(--accent);padding:2px 7px;border-radius:4px;}
   .brand h1{font-family:var(--font-display);font-size:19px;font-weight:600;margin:0;letter-spacing:0.01em;}
   .brand span.sub{color:#8B96A3;font-size:12px;font-family:var(--font-mono);letter-spacing:0.04em;}
-  .topbar-right{display:flex;align-items:center;gap:4px;}
+  .topbar-right{display:flex;align-items:center;gap:12px;}
   nav.tabs{display:flex;gap:2px;}
   nav.tabs button{background:transparent;border:none;color:#AEB8C2;font-size:14px;font-weight:500;padding:18px 16px;border-bottom:3px solid transparent;margin-bottom:-3px;transition:color .15s ease, border-color .15s ease;}
   nav.tabs button:hover{color:#fff;}
   nav.tabs button.active{color:#fff;border-bottom-color:var(--accent);}
+  .user-chip{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#AEB8C2;}
+  .user-chip .role-tag{font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.05em;border:1px solid #333F4C;border-radius:4px;padding:1px 6px;color:#AEB8C2;}
   .gear-btn{background:transparent;border:1px solid #333F4C;color:#AEB8C2;border-radius:8px;padding:7px 12px;font-size:12.5px;display:flex;align-items:center;gap:6px;}
   .gear-btn:hover{border-color:var(--accent);color:#fff;}
   .status-dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:none;}
@@ -134,22 +148,6 @@
   .empty-state{text-align:center;padding:48px 20px;color:var(--ink-soft);}
   .empty-state .big{font-size:28px;margin-bottom:6px;}
 
-  /* Settings modal */
-  .modal-overlay{position:fixed;inset:0;background:rgba(22,31,41,0.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
-  .modal-overlay.show{display:flex;}
-  .modal{background:#fff;border-radius:var(--radius);max-width:520px;width:100%;box-shadow:var(--shadow);}
-  .modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
-  .modal-head h3{font-family:var(--font-display);font-size:16px;margin:0;}
-  .modal-close{background:none;border:none;font-size:18px;color:var(--ink-faint);}
-  .modal-body{padding:20px 22px;}
-  .modal-body p{font-size:13px;color:var(--ink-soft);line-height:1.6;margin:0 0 12px;}
-  .modal-body ol{font-size:12.5px;color:var(--ink-soft);line-height:1.8;padding-left:18px;margin:0 0 16px;}
-  .modal-body input{width:100%;border:1px solid var(--line);border-radius:var(--radius-sm);padding:9px 11px;font-size:13px;font-family:var(--font-mono);}
-  .modal-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
-  .conn-msg{font-size:12.5px;margin-top:10px;min-height:16px;}
-  .conn-msg.ok{color:var(--positive);}
-  .conn-msg.err{color:var(--negative);}
-
   .loading-veil{position:fixed;inset:0;background:rgba(237,240,244,0.6);display:none;align-items:center;justify-content:center;z-index:90;font-size:13px;color:var(--ink-soft);font-family:var(--font-mono);}
   .loading-veil.show{display:flex;}
 
@@ -165,15 +163,43 @@
     .form-grid{grid-template-columns:1fr;}
     .field.span-2{grid-column:span 1;}
     nav.tabs button{padding:14px 10px;font-size:13px;}
+    .user-chip{display:none;}
   }
 </style>
 </head>
 <body>
 
+<!-- ============ AUTH SCREEN ============ -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <span class="brand-mark">EXP·LEDGER</span>
+    <h1>活動管理系統登入</h1>
+    <div class="banner err" id="configBanner" style="display:none;">
+      尚未設定 Supabase 連線資訊，請在 <code>index.html</code> 裡填入 SUPABASE_URL 與 SUPABASE_ANON_KEY。
+    </div>
+    <form id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login_email" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label>密碼</label>
+        <input type="password" id="login_password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" id="loginSubmitBtn" style="width:100%;">登入</button>
+      <div class="form-msg" id="loginMsg" style="text-align:center;"></div>
+    </form>
+    <p class="hint">帳號由管理員在 Supabase 後台建立，如果沒有帳號請聯絡 Eric。</p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appShell" style="display:none;">
+
 <header class="topbar">
   <div class="brand">
     <span class="brand-mark">EXP·LEDGER</span>
-    <h1>展覽費用管理系統</h1>
+    <h1>活動管理系統</h1>
     <span class="sub">Exhibition Expense Tracker</span>
   </div>
   <div class="topbar-right">
@@ -181,25 +207,20 @@
       <button data-view="dashboard" class="active">儀表板</button>
       <button data-view="expenses">費用明細</button>
       <button data-view="exhibitions">展覽總覽</button>
-      <button data-view="users" id="navUsersBtn" style="display:none;">使用者管理</button>
     </nav>
-    <span id="currentUserLabel" style="color:#8B96A3;font-size:12px;font-family:var(--font-mono);margin-right:4px;"></span>
-    <button class="gear-btn" id="openSettingsBtn"><span class="status-dot" id="statusDot"></span><span id="statusLabel">尚未連線</span></button>
+    <span class="user-chip"><span class="status-dot ok"></span><span id="userNameLabel"></span><span class="role-tag" id="userRoleLabel"></span></span>
+    <button class="gear-btn" id="logoutBtn">登出</button>
   </div>
 </header>
 
 <main>
 
-  <div class="banner warn" id="notConfiguredBanner" style="display:none;">
-    尚未連接 Google Sheet，目前看到的都是空白畫面。
-    <button class="link" id="bannerSettingsBtn">點此設定連線網址</button>
-  </div>
   <div class="banner err" id="connErrorBanner" style="display:none;"></div>
 
   <!-- ============ DASHBOARD ============ -->
   <section id="view-dashboard" class="view active">
     <h2 class="view-title">儀表板</h2>
-    <p class="view-desc">所有展覽的預算與實際支出總覽，資料直接來自 Google Sheet，所有人共用同一份。</p>
+    <p class="view-desc">所有展覽的預算與實際支出總覽，資料存在 Supabase，所有登入的人共用同一份。</p>
     <div class="stat-grid" id="statGrid"></div>
     <div class="chart-grid">
       <div class="card card-pad chart-card">
@@ -254,7 +275,6 @@
             <label>項目 <span class="req">*</span></label>
             <input type="text" id="f_item" placeholder="例如：主視覺輸出" required>
           </div>
-
           <div class="field">
             <label>廠商</label>
             <input type="text" id="f_vendor" placeholder="廠商名稱">
@@ -275,7 +295,6 @@
             </div>
             <div class="rate-hint" id="rateHint"></div>
           </div>
-
           <div class="field">
             <label>台幣金額（自動）</label>
             <div class="field-computed" id="f_twd_preview">NT$ 0</div>
@@ -320,7 +339,7 @@
   <!-- ============ EXHIBITIONS ============ -->
   <section id="view-exhibitions" class="view">
     <h2 class="view-title">展覽總覽</h2>
-    <p class="view-desc">建立展覽並設定預算，總成本與差異由 Google Sheet 公式自動加總計算。</p>
+    <p class="view-desc">建立展覽並設定預算，總成本與差異依費用明細即時加總。</p>
 
     <details class="card card-pad form-card" id="exhibitionFormCard" open>
       <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增展覽</summary>
@@ -362,76 +381,30 @@
     <div class="card"><div id="exhibitionTableWrap"></div></div>
   </section>
 
-  <!-- ============ USERS (管理員限定) ============ -->
-  <section id="view-users" class="view">
-    <h2 class="view-title">使用者管理</h2>
-    <p class="view-desc">管理誰可以使用這個系統、各自的角色。異動會直接寫回 Google Sheet 的「使用者權限」分頁，不用手動改表。</p>
-
-    <details class="card card-pad form-card" id="userFormCard" open>
-      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增使用者</summary>
-      <form id="userForm">
-        <div class="form-grid">
-          <div class="field span-2">
-            <label>Email <span class="req">*</span></label>
-            <input type="email" id="u_email" placeholder="name@gptt.com.tw" required>
-          </div>
-          <div class="field">
-            <label>姓名 <span class="req">*</span></label>
-            <input type="text" id="u_name" required>
-          </div>
-          <div class="field">
-            <label>角色 <span class="req">*</span></label>
-            <select id="u_role" required></select>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary" id="userSubmitBtn">新增使用者</button>
-          <button type="button" class="btn btn-ghost" id="userCancelBtn" style="display:none;">取消編輯</button>
-          <span class="form-msg" id="userFormMsg"></span>
-        </div>
-      </form>
-    </details>
-
-    <div class="card"><div id="userTableWrap"></div></div>
-  </section>
-
 </main>
 
 <footer class="page-footer">
-  <span>資料儲存在你設定的 Google Sheet 上，開這份 HTML 的所有人共用同一份資料。</span>
-  <button class="link-btn" id="openSettingsBtnFooter">連線設定</button>
+  <span>資料儲存在 Supabase，登入的所有人共用同一份資料。</span>
 </footer>
+
+</div><!-- /appShell -->
 
 <div class="toast" id="toast"></div>
 <div class="loading-veil" id="loadingVeil">處理中...</div>
 
-<!-- Settings modal -->
-<div class="modal-overlay" id="settingsOverlay">
-  <div class="modal">
-    <div class="modal-head">
-      <h3>Google Sheet 連線設定</h3>
-      <button class="modal-close" id="closeSettingsBtn">✕</button>
-    </div>
-    <div class="modal-body">
-      <p>把部署好的 Google Apps Script 網頁應用程式網址貼在這裡（結尾是 <code>/exec</code>）。設定會存在這台電腦的瀏覽器裡，下次打開不用再貼一次。</p>
-      <input type="text" id="settingsUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec">
-      <div class="modal-actions">
-        <button class="btn btn-primary btn-sm" id="saveSettingsBtn">儲存並連線</button>
-        <button class="btn btn-ghost btn-sm" id="testSettingsBtn">測試連線</button>
-      </div>
-      <div class="conn-msg" id="connMsg"></div>
-      <ol style="margin-top:16px;">
-        <li>建立一個新的 Google 試算表</li>
-        <li>「擴充功能」→「Apps Script」，貼上後端程式碼並儲存</li>
-        <li>執行一次 <code>setupSheets</code> 函式並授權</li>
-        <li>「部署」→「新增部署作業」→網頁應用程式，存取權設「任何人」</li>
-        <li>把產生的網址貼到上面欄位</li>
-      </ol>
-    </div>
-  </div>
-</div>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-<script>
+// ---------------- Supabase 連線設定 ----------------
+// 這是公開的 anon key，配合 Row Level Security 使用是安全的設計，可以放在前端程式碼裡。
+// 絕對不要把 service role key 放在這裡或 commit 進 repo。
+const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const IS_CONFIGURED = !!SUPABASE_URL && !!SUPABASE_ANON_KEY && !SUPABASE_URL.includes('YOUR_SUPABASE');
+const RATE_FUNCTION_URL = IS_CONFIGURED ? SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/bot-rate' : '';
+
+const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
 (function(){
   "use strict";
 
@@ -446,15 +419,10 @@
   var CATEGORY_TYPE = {};
   CATEGORY_GROUPS.forEach(function(g){ g.items.forEach(function(c){ CATEGORY_TYPE[c] = g.type; }); });
   var PAYMENTS = ["匯款","公司卡","現金","其他"];
-  // 五位使用者姓名，申請人下拉選單用（跟權限系統批次的名單一致）
-  var USERS = ["Eric","Grace","Lina","Albert","Hanson"];
-  // 權限角色：真正的權限判斷都在後端做，這裡只是給「使用者管理」表單的下拉選單用
-  var ROLES = ["管理員","編輯者","檢視者"];
   // 常見國家清單，展覽總覽的「國家」下拉選單用
   var COUNTRIES = ["台灣","中國","香港","澳門","日本","韓國","新加坡","馬來西亞","泰國","越南","印尼","菲律賓","印度",
     "美國","加拿大","英國","德國","法國","義大利","荷蘭","西班牙","瑞士","澳洲","紐西蘭","阿聯","沙烏地阿拉伯","其他"];
-  // 幣別：亞洲各國幣別 + 美金/歐元/英鎊/澳幣，分區列出方便找
-  // 只列台灣銀行牌告匯率實際有報價的幣別（共 19 種）+ 新台幣本身
+  // 幣別：只列台灣銀行牌告匯率實際有報價的幣別（共 19 種）+ 新台幣本身
   var CURRENCY_GROUPS = [
     { label:'常用', items:[
       ['TWD','新台幣'], ['USD','美元'], ['EUR','歐元'], ['JPY','日圓'], ['CNY','人民幣'], ['HKD','港幣']
@@ -468,13 +436,7 @@
       ['NZD','紐西蘭幣'], ['SEK','瑞典克朗'], ['ZAR','南非幣']
     ]}
   ];
-  // 上面全部都是台灣銀行牌告匯率有報價的幣別，「抓台銀匯率」一定抓得到（TWD 除外，固定為 1）
   var BOT_SUPPORTED = ['USD','HKD','GBP','AUD','CAD','SGD','CHF','JPY','ZAR','SEK','NZD','THB','PHP','IDR','EUR','KRW','VND','MYR','CNY'];
-  var LS_URL_KEY = 'expLedgerAppsScriptUrl';
-  var LS_CACHE_KEY = 'expLedgerCache';
-
-  // 如果你已經有部署好的網址，可以直接寫死在這裡，這樣同事打開就不用自己設定：
-  var DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyABErG3bM8JzRULbyfOg8Wc_N7f7u_PDCUHjdAOpn1uDuyG4Mom0GbuWrgy6Gh3ENn/exec';
 
   function categoryColor(cat){
     var i = CATEGORIES.indexOf(cat);
@@ -484,36 +446,13 @@
   }
 
   // ---------------- State ----------------
-  var state = { exhibitions: [], expenses: [], users: [], currentUser: null };
+  var state = { exhibitions: [], expenses: [], profiles: [] };
+  var currentUser = null; // { id, email, name, role }
   var editingExpenseId = null;
   var editingExhibitionId = null;
-  var editingUserId = null;
   var suppressAutoFetch = false;
   var budgetChartInst = null;
   var categoryChartInst = null;
-  var appsScriptUrl = '';
-
-  // 這裡只是體驗優化（隱藏檢視者用不到的按鈕），真正把關在後端 requireAccess()，
-  // 就算有人用瀏覽器工具把按鈕挖出來硬點，後端還是會擋掉寫入
-  function isViewer(){ return !!(state.currentUser && state.currentUser.role === '檢視者'); }
-  function isAdmin(){ return !!(state.currentUser && state.currentUser.role === '管理員'); }
-
-  function applyPermissionUI(){
-    var label = document.getElementById('currentUserLabel');
-    if(state.currentUser && state.currentUser.email){
-      label.textContent = state.currentUser.email + ' · ' + (state.currentUser.role || '無權限');
-    } else {
-      label.textContent = '';
-    }
-    document.getElementById('navUsersBtn').style.display = isAdmin() ? '' : 'none';
-    document.getElementById('expenseFormCard').style.display = isViewer() ? 'none' : '';
-    document.getElementById('exhibitionFormCard').style.display = isViewer() ? 'none' : '';
-    document.getElementById('exportCsvBtn').style.display = isViewer() ? 'none' : '';
-    // 如果目前停在使用者管理分頁，但角色已經不是管理員了（例如被別人改掉權限），切回儀表板
-    if(!isAdmin() && document.getElementById('view-users').classList.contains('active')){
-      document.querySelector('nav.tabs button[data-view="dashboard"]').click();
-    }
-  }
 
   function fmtInt(n){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits:0}).format(Math.round(n||0)); }
   function fmtNum(n, dp){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits: dp==null?2:dp}).format(n||0); }
@@ -529,56 +468,68 @@
   }
   function showLoading(on){ document.getElementById('loadingVeil').classList.toggle('show', !!on); }
 
-  // ---------------- Connection status ----------------
-  function setStatus(mode, label){
-    var dot = document.getElementById('statusDot');
-    dot.className = 'status-dot' + (mode ? ' ' + mode : '');
-    document.getElementById('statusLabel').textContent = label;
-  }
+  // ---------------- Auth ----------------
+  document.getElementById('configBanner').style.display = IS_CONFIGURED ? 'none' : 'flex';
+  document.getElementById('loginSubmitBtn').disabled = !IS_CONFIGURED;
 
-  // ---------------- Settings modal ----------------
-  var overlay = document.getElementById('settingsOverlay');
-  function openSettings(){
-    document.getElementById('settingsUrlInput').value = appsScriptUrl || '';
-    document.getElementById('connMsg').textContent = '';
-    overlay.classList.add('show');
-  }
-  function closeSettings(){ overlay.classList.remove('show'); }
-  document.getElementById('openSettingsBtn').addEventListener('click', openSettings);
-  document.getElementById('openSettingsBtnFooter').addEventListener('click', openSettings);
-  document.getElementById('bannerSettingsBtn').addEventListener('click', openSettings);
-  document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
-  overlay.addEventListener('click', function(e){ if(e.target === overlay) closeSettings(); });
-
-  document.getElementById('testSettingsBtn').addEventListener('click', async function(){
-    var url = document.getElementById('settingsUrlInput').value.trim();
-    var msg = document.getElementById('connMsg');
-    if(!url){ msg.textContent = '請先輸入網址'; msg.className='conn-msg err'; return; }
-    msg.textContent = '測試中...'; msg.className = 'conn-msg';
+  document.getElementById('loginForm').addEventListener('submit', async function(ev){
+    ev.preventDefault();
+    if(!IS_CONFIGURED) return;
+    var msg = document.getElementById('loginMsg');
+    var email = document.getElementById('login_email').value.trim();
+    var password = document.getElementById('login_password').value;
+    msg.textContent = '';
+    document.getElementById('loginSubmitBtn').disabled = true;
     try{
-      var res = await fetch(url + '?action=list');
-      var data = await res.json();
-      if(data && (data.exhibitions !== undefined)){
-        msg.textContent = '連線成功！讀到 ' + data.exhibitions.length + ' 個展覽、' + data.expenses.length + ' 筆費用。';
-        msg.className = 'conn-msg ok';
-      } else {
-        msg.textContent = '連線回應格式異常，請確認網址正確且已部署為「任何人」可存取。';
-        msg.className = 'conn-msg err';
-      }
+      var res = await supabase.auth.signInWithPassword({ email: email, password: password });
+      if(res.error) throw res.error;
+      await afterLogin();
     }catch(err){
-      msg.textContent = '連線失敗：' + err.message;
-      msg.className = 'conn-msg err';
+      msg.textContent = '登入失敗：' + (err.message || '帳號或密碼錯誤');
+    }finally{
+      document.getElementById('loginSubmitBtn').disabled = false;
     }
   });
 
-  document.getElementById('saveSettingsBtn').addEventListener('click', async function(){
-    var url = document.getElementById('settingsUrlInput').value.trim();
-    if(!url){ toast('請先輸入網址'); return; }
-    appsScriptUrl = url;
-    try{ localStorage.setItem(LS_URL_KEY, url); }catch(e){}
-    closeSettings();
-    await loadState(true);
+  document.getElementById('logoutBtn').addEventListener('click', async function(){
+    showLoading(true);
+    try{ await supabase.auth.signOut(); }catch(e){}
+    showLoading(false);
+    showAuthScreen();
   });
+
+  function showAuthScreen(){
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appShell').style.display = 'none';
+    currentUser = null;
+  }
+
+  async function showAppShell(){
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+  }
+
+  async function afterLogin(){
+    var sessionRes = await supabase.auth.getSession();
+    var user = sessionRes.data.session && sessionRes.data.session.user;
+    if(!user){ showAuthScreen(); return; }
+
+    var profRes = await supabase.from('profiles').select('id,email,name,role').eq('id', user.id).maybeSingle();
+    if(profRes.error || !profRes.data){
+      document.getElementById('loginMsg').textContent = '找不到您的使用者權限資料，請聯絡管理員確認帳號設定';
+      await supabase.auth.signOut();
+      return;
+    }
+    currentUser = profRes.data;
+    document.getElementById('userNameLabel').textContent = currentUser.name;
+    document.getElementById('userRoleLabel').textContent = roleLabel(currentUser.role);
+    await showAppShell();
+    await loadState();
+  }
+
+  function roleLabel(role){
+    return role === 'admin' ? '管理員' : role === 'editor' ? '編輯者' : role === 'viewer' ? '檢視者' : role;
+  }
 
   // ---------------- Tabs ----------------
   document.querySelectorAll('nav.tabs button').forEach(function(btn){
@@ -588,12 +539,11 @@
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if(btn.dataset.view === 'dashboard') renderDashboard();
-      if(btn.dataset.view === 'users') loadUsers();
     });
   });
 
   // ---------------- Static selects ----------------
-  function fillSelect(sel, options, placeholder){
+  function fillSelect(sel, options, placeholder, valueKey, labelKey){
     sel.innerHTML = '';
     if(placeholder){
       var o = document.createElement('option');
@@ -602,7 +552,8 @@
     }
     options.forEach(function(v){
       var o = document.createElement('option');
-      o.value = v; o.textContent = v;
+      if(valueKey){ o.value = v[valueKey]; o.textContent = v[labelKey]; }
+      else { o.value = v; o.textContent = v; }
       sel.appendChild(o);
     });
   }
@@ -645,11 +596,9 @@
   function refreshExhibitionSelects(){
     var expSel = document.getElementById('f_exhibition');
     var filterSel = document.getElementById('expenseFilter');
-    var names = state.exhibitions.map(function(e){ return e.name; });
-
     var keepExp = expSel.value;
     expSel.innerHTML = '';
-    if(names.length === 0){
+    if(state.exhibitions.length === 0){
       var o = document.createElement('option');
       o.value=''; o.textContent = '請先於「展覽總覽」新增展覽';
       expSel.appendChild(o);
@@ -657,68 +606,46 @@
       var ph = document.createElement('option');
       ph.value=''; ph.textContent='請選擇展覽'; ph.disabled=true;
       expSel.appendChild(ph);
-      names.forEach(function(n){
-        var o = document.createElement('option'); o.value = n; o.textContent = n; expSel.appendChild(o);
+      state.exhibitions.forEach(function(ex){
+        var o = document.createElement('option'); o.value = ex.id; o.textContent = ex.name; expSel.appendChild(o);
       });
-      expSel.value = names.indexOf(keepExp) >= 0 ? keepExp : '';
+      expSel.value = state.exhibitions.some(function(ex){return ex.id===keepExp;}) ? keepExp : '';
     }
 
     var keepFilter = filterSel.value;
     filterSel.innerHTML = '<option value="">全部展覽</option>';
-    names.forEach(function(n){
-      var o = document.createElement('option'); o.value = n; o.textContent = n; filterSel.appendChild(o);
+    state.exhibitions.forEach(function(ex){
+      var o = document.createElement('option'); o.value = ex.id; o.textContent = ex.name; filterSel.appendChild(o);
     });
-    if(names.indexOf(keepFilter) >= 0) filterSel.value = keepFilter;
+    if(state.exhibitions.some(function(ex){return ex.id===keepFilter;})) filterSel.value = keepFilter;
   }
 
-  // ---------------- API layer ----------------
-  async function apiGet(params){
-    if(!appsScriptUrl) throw new Error('尚未設定 Google Sheet 連線網址');
-    var qs = new URLSearchParams(params || {}).toString();
-    var res = await fetch(appsScriptUrl + (qs ? '?' + qs : ''));
-    if(!res.ok) throw new Error('伺服器回應錯誤 ' + res.status);
-    return res.json();
-  }
-  async function apiPost(action, payload){
-    if(!appsScriptUrl) throw new Error('尚未設定 Google Sheet 連線網址');
-    var res = await fetch(appsScriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免瀏覽器 CORS 預檢請求
-      body: JSON.stringify({ action: action, payload: payload })
-    });
-    if(!res.ok) throw new Error('伺服器回應錯誤 ' + res.status);
-    var data = await res.json();
-    if(data.result && data.result.error) throw new Error(data.result.error);
-    return data;
+  function refreshApplicantSelect(){
+    fillSelect(document.getElementById('f_applicant'), state.profiles, '請選擇申請人', 'id', 'name');
   }
 
-  async function loadState(showBanalready){
+  // ---------------- Data layer (Supabase) ----------------
+  async function loadState(){
     document.getElementById('connErrorBanner').style.display = 'none';
-    document.getElementById('notConfiguredBanner').style.display = appsScriptUrl ? 'none' : 'flex';
-    if(!appsScriptUrl){ setStatus('', '尚未連線'); renderAll(); return; }
-    setStatus('', '連線中...');
     showLoading(true);
     try{
-      var data = await apiGet({ action: 'list' });
-      if(data.error) throw new Error(data.error);
-      state.exhibitions = data.exhibitions || [];
-      state.expenses = data.expenses || [];
-      state.currentUser = data.currentUser || null;
-      try{ localStorage.setItem(LS_CACHE_KEY, JSON.stringify(state)); }catch(e){}
-      setStatus('ok', '已連線');
-      applyPermissionUI();
+      var exRes = await supabase.from('exhibitions').select('*').order('created_at', { ascending:false });
+      if(exRes.error) throw exRes.error;
+      var expRes = await supabase.from('expenses')
+        .select('*, exhibition:exhibitions!exhibition_id(id,name), applicant:profiles!applicant_id(id,name)')
+        .order('date', { ascending:false });
+      if(expRes.error) throw expRes.error;
+      var profRes = await supabase.from('profiles').select('id,email,name,role').order('name');
+      if(profRes.error) throw profRes.error;
+
+      state.exhibitions = exRes.data || [];
+      state.expenses = expRes.data || [];
+      state.profiles = profRes.data || [];
       renderAll();
     }catch(err){
-      setStatus('err', '連線失敗');
       var banner = document.getElementById('connErrorBanner');
       banner.style.display = 'flex';
-      banner.textContent = '無法讀取 Google Sheet：' + err.message + '（顯示的是最後一次成功讀取的快取資料）';
-      try{
-        var cached = localStorage.getItem(LS_CACHE_KEY);
-        if(cached){ var c = JSON.parse(cached); state.exhibitions = c.exhibitions||[]; state.expenses = c.expenses||[]; state.currentUser = c.currentUser||null; }
-      }catch(e){}
-      applyPermissionUI();
-      renderAll();
+      banner.textContent = '無法讀取資料：' + (err.message || err);
     }finally{
       showLoading(false);
     }
@@ -726,6 +653,7 @@
 
   function renderAll(){
     refreshExhibitionSelects();
+    refreshApplicantSelect();
     renderExpenseTable();
     renderExhibitionTable();
     renderDashboard();
@@ -745,29 +673,6 @@
   document.getElementById('f_amount').addEventListener('input', updateTwdPreview);
   document.getElementById('f_rate').addEventListener('input', updateTwdPreview);
 
-  function updateRateButtonState(){
-    var currency = document.getElementById('f_currency').value;
-    var btn = document.getElementById('fetchRateBtn');
-    var rateField = document.getElementById('f_rate');
-    var hint = document.getElementById('rateHint');
-    if(currency === 'TWD'){
-      rateField.value = 1; rateField.disabled = true; btn.disabled = true; hint.textContent = '';
-    } else if(currency === '其他'){
-      rateField.value = ''; rateField.disabled = false; btn.disabled = true; hint.textContent = '自訂幣別請手動輸入匯率';
-    } else if(BOT_SUPPORTED.indexOf(currency) < 0){
-      rateField.value = ''; rateField.disabled = false; btn.disabled = true; hint.textContent = '台銀未提供「' + currency + '」牌告匯率，請手動輸入';
-    } else {
-      rateField.disabled = false; btn.disabled = !appsScriptUrl;
-      if(!suppressAutoFetch){
-        rateField.value = '';             // 換幣別時先清空，避免留著前一個幣別的匯率誤導
-        hint.textContent = appsScriptUrl ? '查詢台銀匯率中...' : '尚未連線 Google Sheet，請按右上角「連線設定」';
-        if(appsScriptUrl) fetchRate();    // 自動抓當天匯率，不用再手動按按鈕
-      } else {
-        hint.textContent = '';
-      }
-    }
-    updateTwdPreview();
-  }
   function updateExpenseTypeState(){
     var category = document.getElementById('f_category').value;
     var type = CATEGORY_TYPE[category] || '';
@@ -784,12 +689,46 @@
     }
   }
   document.getElementById('f_category').addEventListener('change', updateExpenseTypeState);
+
+  function updateRateButtonState(){
+    var currency = document.getElementById('f_currency').value;
+    var btn = document.getElementById('fetchRateBtn');
+    var rateField = document.getElementById('f_rate');
+    var hint = document.getElementById('rateHint');
+    if(currency === 'TWD'){
+      rateField.value = 1; rateField.disabled = true; btn.disabled = true; hint.textContent = '';
+    } else if(currency === '其他'){
+      rateField.value = ''; rateField.disabled = false; btn.disabled = true; hint.textContent = '自訂幣別請手動輸入匯率';
+    } else if(BOT_SUPPORTED.indexOf(currency) < 0){
+      rateField.value = ''; rateField.disabled = false; btn.disabled = true; hint.textContent = '台銀未提供「' + currency + '」牌告匯率，請手動輸入';
+    } else {
+      rateField.disabled = false; btn.disabled = !IS_CONFIGURED;
+      if(!suppressAutoFetch){
+        rateField.value = '';
+        hint.textContent = '查詢台銀匯率中...';
+        fetchRate();
+      } else {
+        hint.textContent = '';
+      }
+    }
+    updateTwdPreview();
+  }
   document.getElementById('f_currency').addEventListener('change', updateRateButtonState);
-  // 換日期時，如果目前幣別台銀有牌價，也一併重新抓當天匯率
   document.getElementById('f_date').addEventListener('change', function(){
     var currency = document.getElementById('f_currency').value;
-    if(appsScriptUrl && BOT_SUPPORTED.indexOf(currency) >= 0) fetchRate();
+    if(BOT_SUPPORTED.indexOf(currency) >= 0) fetchRate();
   });
+
+  async function fetchBotRate(date, currency){
+    var sessionRes = await supabase.auth.getSession();
+    var token = (sessionRes.data.session && sessionRes.data.session.access_token) || SUPABASE_ANON_KEY;
+    var url = RATE_FUNCTION_URL + '?date=' + encodeURIComponent(date) + '&currency=' + encodeURIComponent(currency);
+    var res = await fetch(url, {
+      headers: { Authorization: 'Bearer ' + token, apikey: SUPABASE_ANON_KEY }
+    });
+    if(!res.ok) throw new Error('匯率查詢服務回應錯誤 ' + res.status);
+    return res.json();
+  }
 
   async function fetchRate(){
     var currency = document.getElementById('f_currency').value;
@@ -800,7 +739,7 @@
     btn.disabled = true;
     hint.textContent = '查詢台銀匯率中...';
     try{
-      var data = await apiGet({ action:'rate', date: date, currency: currency });
+      var data = await fetchBotRate(date, currency);
       if(data.error){ hint.textContent = data.error; }
       else{
         var rate = data.spotSell || data.spotBuy || data.cashSell || data.cashBuy;
@@ -812,7 +751,7 @@
     }catch(err){
       hint.textContent = '查詢失敗：' + err.message;
     }finally{
-      btn.disabled = (currency==='TWD'||currency==='其他'||BOT_SUPPORTED.indexOf(currency)<0||!appsScriptUrl);
+      btn.disabled = (currency==='TWD'||currency==='其他'||BOT_SUPPORTED.indexOf(currency)<0||!IS_CONFIGURED);
     }
   }
   document.getElementById('fetchRateBtn').addEventListener('click', fetchRate);
@@ -833,42 +772,45 @@
   document.getElementById('expenseForm').addEventListener('submit', async function(ev){
     ev.preventDefault();
     var msg = document.getElementById('expenseFormMsg');
-    var exhibitionName = document.getElementById('f_exhibition').value;
-    if(!exhibitionName){ msg.textContent = '請先新增展覽並選擇展覽'; return; }
+    var exhibitionId = document.getElementById('f_exhibition').value;
+    if(!exhibitionId){ msg.textContent = '請先新增展覽並選擇展覽'; return; }
     var amount = parseFloat(document.getElementById('f_amount').value);
     var rate = parseFloat(document.getElementById('f_rate').value);
     if(!(amount >= 0) || !(rate >= 0)){ msg.textContent = '金額與匯率需為正數'; return; }
     var category = document.getElementById('f_category').value;
     var expenseType = CATEGORY_TYPE[category] || '';
-    var applicant = document.getElementById('f_applicant').value;
-    if(expenseType === '個人' && !applicant){ msg.textContent = '個人費用請選擇申請人'; return; }
+    var applicantId = document.getElementById('f_applicant').value;
+    if(expenseType === '個人' && !applicantId){ msg.textContent = '個人費用請選擇申請人'; return; }
 
     var payload = {
-      id: editingExpenseId,
-      exhibitionName: exhibitionName,
+      exhibition_id: exhibitionId,
       date: document.getElementById('f_date').value,
       category: category,
+      expense_type: expenseType,
+      applicant_id: expenseType === '個人' ? applicantId : null,
       item: document.getElementById('f_item').value.trim(),
       vendor: document.getElementById('f_vendor').value.trim(),
       currency: document.getElementById('f_currency').value,
       amount: amount,
       rate: rate,
-      payment: document.getElementById('f_payment').value,
+      payment_method: document.getElementById('f_payment').value,
       invoice: document.getElementById('f_invoice').value.trim(),
-      note: document.getElementById('f_note').value.trim(),
-      applicant: expenseType === '個人' ? applicant : ''
+      note: document.getElementById('f_note').value.trim()
     };
 
     showLoading(true);
     try{
-      var data = editingExpenseId
-        ? await apiPost('updateExpense', payload)
-        : await apiPost('addExpense', payload);
-      state.exhibitions = data.exhibitions || [];
-      state.expenses = data.expenses || [];
+      var res;
+      if(editingExpenseId){
+        res = await supabase.from('expenses').update(payload).eq('id', editingExpenseId);
+      } else {
+        payload.created_by = currentUser.id;
+        res = await supabase.from('expenses').insert(payload);
+      }
+      if(res.error) throw res.error;
       toast(editingExpenseId ? '已更新費用' : '已新增費用');
       resetExpenseForm();
-      renderAll();
+      await loadState();
     }catch(err){
       msg.textContent = '儲存失敗：' + err.message;
     }finally{
@@ -881,11 +823,11 @@
     if(!rec) return;
     editingExpenseId = id;
     document.getElementById('expenseFormCard').open = true;
-    document.getElementById('f_exhibition').value = rec.exhibitionName;
+    document.getElementById('f_exhibition').value = rec.exhibition_id;
     document.getElementById('f_date').value = rec.date;
     document.getElementById('f_category').value = rec.category;
     updateExpenseTypeState();
-    document.getElementById('f_applicant').value = rec.applicant || '';
+    document.getElementById('f_applicant').value = rec.applicant_id || '';
     document.getElementById('f_item').value = rec.item;
     document.getElementById('f_vendor').value = rec.vendor;
     suppressAutoFetch = true;
@@ -893,7 +835,7 @@
     updateRateButtonState();
     document.getElementById('f_amount').value = rec.amount;
     document.getElementById('f_rate').value = rec.rate;
-    document.getElementById('f_payment').value = rec.payment;
+    document.getElementById('f_payment').value = rec.payment_method;
     document.getElementById('f_invoice').value = rec.invoice;
     document.getElementById('f_note').value = rec.note;
     updateTwdPreview();
@@ -907,10 +849,9 @@
     if(!confirm('確定要刪除這筆費用嗎？')) return;
     showLoading(true);
     try{
-      var data = await apiPost('deleteExpense', { id: id });
-      state.exhibitions = data.exhibitions || [];
-      state.expenses = data.expenses || [];
-      renderAll();
+      var res = await supabase.from('expenses').delete().eq('id', id);
+      if(res.error) throw res.error;
+      await loadState();
       toast('已刪除');
     }catch(err){
       toast('刪除失敗：' + err.message);
@@ -923,38 +864,38 @@
 
   function renderExpenseTable(){
     var wrap = document.getElementById('expenseTableWrap');
-    var filterName = document.getElementById('expenseFilter').value;
-    var rows = state.expenses.filter(function(x){ return !filterName || x.exhibitionName === filterName; });
+    var filterId = document.getElementById('expenseFilter').value;
+    var rows = state.expenses.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
     rows = rows.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
 
     if(rows.length === 0){
       wrap.innerHTML = '<div class="empty-state"><div class="big">📋</div>尚未有費用資料，請於上方表單新增第一筆支出。</div>';
       return;
     }
-    var total = rows.reduce(function(s,r){ return s + (Number(r.twd)||0); }, 0);
+    var total = rows.reduce(function(s,r){ return s + (Number(r.twd_amount)||0); }, 0);
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
       '<th>展覽</th><th>日期</th><th>類別</th><th>類型</th><th>申請人</th><th>項目</th><th>廠商</th>' +
       '<th class="num">原幣金額</th><th class="num">匯率</th><th class="num">台幣金額</th>' +
       '<th>付款方式</th><th>發票</th><th>備註</th><th></th></tr></thead><tbody>';
     rows.forEach(function(r){
       html += '<tr>' +
-        '<td>' + escapeHtml(r.exhibitionName) + '</td>' +
+        '<td>' + escapeHtml(r.exhibition && r.exhibition.name) + '</td>' +
         '<td class="mono">' + escapeHtml(r.date) + '</td>' +
         '<td><span class="tag" style="color:' + categoryColor(r.category) + ';">' + escapeHtml(r.category) + '</span></td>' +
-        '<td>' + escapeHtml(r.expenseType||'—') + '</td>' +
-        '<td>' + escapeHtml(r.applicant||'—') + '</td>' +
+        '<td>' + escapeHtml(r.expense_type||'—') + '</td>' +
+        '<td>' + escapeHtml(r.applicant && r.applicant.name || '—') + '</td>' +
         '<td>' + escapeHtml(r.item) + '</td>' +
         '<td>' + escapeHtml(r.vendor||'—') + '</td>' +
         '<td class="num">' + fmtNum(r.amount) + ' ' + escapeHtml(r.currency) + '</td>' +
         '<td class="num">' + fmtNum(r.rate, 4) + '</td>' +
-        '<td class="num" style="font-weight:600;">NT$ ' + fmtInt(r.twd) + '</td>' +
-        '<td>' + escapeHtml(r.payment||'—') + '</td>' +
+        '<td class="num" style="font-weight:600;">NT$ ' + fmtInt(r.twd_amount) + '</td>' +
+        '<td>' + escapeHtml(r.payment_method||'—') + '</td>' +
         '<td>' + escapeHtml(r.invoice||'—') + '</td>' +
         '<td>' + escapeHtml(r.note||'—') + '</td>' +
-        '<td>' + (isViewer() ? '' : '<div class="row-actions">' +
+        '<td><div class="row-actions">' +
           '<button class="icon-btn" data-edit="' + r.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-del="' + r.id + '">刪除</button>' +
-        '</div>') + '</td></tr>';
+        '</div></td></tr>';
     });
     html += '</tbody></table></div>';
     html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆</span><span>小計：NT$ ' + fmtInt(total) + '</span></div>';
@@ -964,13 +905,16 @@
   }
 
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
-    var filterName = document.getElementById('expenseFilter').value;
-    var rows = state.expenses.filter(function(x){ return !filterName || x.exhibitionName === filterName; });
+    var filterId = document.getElementById('expenseFilter').value;
+    var rows = state.expenses.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
     var header = ['展覽','日期','費用類別','費用類型','申請人','項目','廠商','幣別','原幣金額','匯率','台幣金額','付款方式','發票','備註'];
     var lines = [header.join(',')];
     rows.forEach(function(r){
-      var line = [r.exhibitionName, r.date, r.category, r.expenseType, r.applicant, r.item, r.vendor, r.currency, r.amount, r.rate, r.twd, r.payment, r.invoice, r.note]
-        .map(function(v){ v = (v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(v) ? '"' + v + '"' : v; });
+      var line = [
+        r.exhibition && r.exhibition.name, r.date, r.category, r.expense_type,
+        r.applicant && r.applicant.name, r.item, r.vendor, r.currency, r.amount, r.rate,
+        r.twd_amount, r.payment_method, r.invoice, r.note
+      ].map(function(v){ v = (v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(v) ? '"' + v + '"' : v; });
       lines.push(line.join(','));
     });
     var blob = new Blob(["﻿" + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
@@ -1001,23 +945,22 @@
       msg.textContent = '已存在相同名稱的展覽'; return;
     }
     var payload = {
-      id: editingExhibitionId, name: name, budget: budget,
+      name: name, budget: budget,
       note: document.getElementById('e_note').value.trim(),
-      country: document.getElementById('e_country').value,
-      year: document.getElementById('e_year').value ? parseInt(document.getElementById('e_year').value, 10) : '',
-      series: document.getElementById('e_series').value.trim()
+      country: document.getElementById('e_country').value || null,
+      year: document.getElementById('e_year').value ? parseInt(document.getElementById('e_year').value, 10) : null,
+      series: document.getElementById('e_series').value.trim() || null
     };
 
     showLoading(true);
     try{
-      var data = editingExhibitionId
-        ? await apiPost('updateExhibition', payload)
-        : await apiPost('addExhibition', payload);
-      state.exhibitions = data.exhibitions || [];
-      state.expenses = data.expenses || [];
+      var res = editingExhibitionId
+        ? await supabase.from('exhibitions').update(payload).eq('id', editingExhibitionId)
+        : await supabase.from('exhibitions').insert(payload);
+      if(res.error) throw res.error;
       toast(editingExhibitionId ? '已更新展覽' : '已新增展覽');
       resetExhibitionForm();
-      renderAll();
+      await loadState();
     }catch(err){
       msg.textContent = '儲存失敗：' + err.message;
     }finally{
@@ -1047,16 +990,19 @@
     if(!confirm('確定要刪除展覽「' + rec.name + '」嗎？')) return;
     showLoading(true);
     try{
-      var data = await apiPost('deleteExhibition', { name: rec.name });
-      state.exhibitions = data.exhibitions || [];
-      state.expenses = data.expenses || [];
-      renderAll();
+      var res = await supabase.from('exhibitions').delete().eq('id', id);
+      if(res.error) throw res.error;
+      await loadState();
       toast('已刪除展覽');
     }catch(err){
-      toast('刪除失敗：' + err.message);
+      toast('刪除失敗：' + (err.message.indexOf('foreign key') >= 0 ? '這個展覽底下還有費用明細，請先刪除或改指派這些費用' : err.message));
     }finally{
       showLoading(false);
     }
+  }
+
+  function exhibitionCostById(id){
+    return state.expenses.reduce(function(s,e){ return e.exhibition_id===id ? s+(Number(e.twd_amount)||0) : s; }, 0);
   }
 
   function renderExhibitionTable(){
@@ -1068,8 +1014,9 @@
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
       '<th>展覽名稱</th><th>國家</th><th>年度</th><th>展覽系列</th><th class="num">預算</th><th class="num">總成本</th><th class="num">差異</th><th>備註</th><th></th></tr></thead><tbody>';
     state.exhibitions.forEach(function(ex){
-      var cost = Number(ex.cost)||0;
-      var diff = Number(ex.diff)||0;
+      var budget = Number(ex.budget)||0;
+      var cost = exhibitionCostById(ex.id);
+      var diff = budget - cost;
       var diffClass = diff < 0 ? 'delta-neg' : 'delta-pos';
       var diffSign = diff < 0 ? '−NT$ ' + fmtInt(Math.abs(diff)) : '+NT$ ' + fmtInt(diff);
       html += '<tr>' +
@@ -1077,14 +1024,14 @@
         '<td>' + escapeHtml(ex.country || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(ex.year || '—') + '</td>' +
         '<td>' + escapeHtml(ex.series || '—') + '</td>' +
-        '<td class="num">NT$ ' + fmtInt(ex.budget) + '</td>' +
+        '<td class="num">NT$ ' + fmtInt(budget) + '</td>' +
         '<td class="num">NT$ ' + fmtInt(cost) + '</td>' +
         '<td class="num ' + diffClass + '">' + diffSign + '</td>' +
         '<td>' + escapeHtml(ex.note || '—') + '</td>' +
-        '<td>' + (isViewer() ? '' : '<div class="row-actions">' +
+        '<td><div class="row-actions">' +
           '<button class="icon-btn" data-eedit="' + ex.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-edel="' + ex.id + '">刪除</button>' +
-        '</div>') + '</td></tr>';
+        '</div></td></tr>';
     });
     html += '</tbody></table></div>';
     wrap.innerHTML = html;
@@ -1092,114 +1039,10 @@
     wrap.querySelectorAll('[data-edel]').forEach(function(b){ b.addEventListener('click', function(){ deleteExhibition(b.dataset.edel); }); });
   }
 
-  // ---------------- Users（使用者管理，只有管理員看得到；後端也只放行管理員） ----------------
-  async function loadUsers(){
-    if(!isAdmin()) return;
-    showLoading(true);
-    try{
-      var data = await apiGet({ action: 'listUsers' });
-      if(data.error) throw new Error(data.error);
-      state.users = data.users || [];
-      renderUserTable();
-    }catch(err){
-      toast('讀取使用者清單失敗：' + err.message);
-    }finally{
-      showLoading(false);
-    }
-  }
-
-  function resetUserForm(){
-    document.getElementById('userForm').reset();
-    editingUserId = null;
-    document.getElementById('userSubmitBtn').textContent = '新增使用者';
-    document.getElementById('userCancelBtn').style.display = 'none';
-    document.getElementById('userFormMsg').textContent = '';
-  }
-  document.getElementById('userCancelBtn').addEventListener('click', resetUserForm);
-
-  document.getElementById('userForm').addEventListener('submit', async function(ev){
-    ev.preventDefault();
-    var msg = document.getElementById('userFormMsg');
-    var email = document.getElementById('u_email').value.trim();
-    var name = document.getElementById('u_name').value.trim();
-    var role = document.getElementById('u_role').value;
-    if(!email || !name || !role){ msg.textContent = '請填寫 Email、姓名與角色'; return; }
-
-    var payload = { id: editingUserId, email: email, name: name, role: role };
-    showLoading(true);
-    try{
-      var data = editingUserId
-        ? await apiPost('updateUser', payload)
-        : await apiPost('addUser', payload);
-      state.users = data.users || state.users;
-      toast(editingUserId ? '已更新使用者' : '已新增使用者');
-      resetUserForm();
-      renderUserTable();
-    }catch(err){
-      msg.textContent = '儲存失敗：' + err.message;
-    }finally{
-      showLoading(false);
-    }
-  });
-
-  function editUser(id){
-    var rec = state.users.find(function(x){ return x.id === id; });
-    if(!rec) return;
-    editingUserId = id;
-    document.getElementById('userFormCard').open = true;
-    document.getElementById('u_email').value = rec.email;
-    document.getElementById('u_name').value = rec.name;
-    document.getElementById('u_role').value = rec.role;
-    document.getElementById('userSubmitBtn').textContent = '更新使用者';
-    document.getElementById('userCancelBtn').style.display = 'inline-block';
-    document.getElementById('userFormCard').scrollIntoView({behavior:'smooth', block:'start'});
-  }
-
-  async function deleteUserRow(id){
-    var rec = state.users.find(function(x){ return x.id === id; });
-    if(!rec) return;
-    if(!confirm('確定要刪除使用者「' + rec.name + '」（' + rec.email + '）嗎？')) return;
-    showLoading(true);
-    try{
-      var data = await apiPost('deleteUser', { id: id });
-      state.users = data.users || state.users;
-      renderUserTable();
-      toast('已刪除使用者');
-    }catch(err){
-      toast('刪除失敗：' + err.message);
-    }finally{
-      showLoading(false);
-    }
-  }
-
-  function renderUserTable(){
-    var wrap = document.getElementById('userTableWrap');
-    if(state.users.length === 0){
-      wrap.innerHTML = '<div class="empty-state"><div class="big">👥</div>尚無使用者資料。</div>';
-      return;
-    }
-    var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th>Email</th><th>姓名</th><th>角色</th><th></th></tr></thead><tbody>';
-    state.users.forEach(function(u){
-      html += '<tr>' +
-        '<td class="mono">' + escapeHtml(u.email) + '</td>' +
-        '<td>' + escapeHtml(u.name) + '</td>' +
-        '<td><span class="tag">' + escapeHtml(u.role) + '</span></td>' +
-        '<td><div class="row-actions">' +
-          '<button class="icon-btn" data-uedit="' + u.id + '">編輯</button>' +
-          '<button class="icon-btn danger" data-udel="' + u.id + '">刪除</button>' +
-        '</div></td></tr>';
-    });
-    html += '</tbody></table></div>';
-    wrap.innerHTML = html;
-    wrap.querySelectorAll('[data-uedit]').forEach(function(b){ b.addEventListener('click', function(){ editUser(b.dataset.uedit); }); });
-    wrap.querySelectorAll('[data-udel]').forEach(function(b){ b.addEventListener('click', function(){ deleteUserRow(b.dataset.udel); }); });
-  }
-
   // ---------------- Dashboard ----------------
   function renderStatCards(){
     var totalBudget = state.exhibitions.reduce(function(s,e){ return s + (Number(e.budget)||0); }, 0);
-    var totalCost = state.expenses.reduce(function(s,e){ return s + (Number(e.twd)||0); }, 0);
+    var totalCost = state.expenses.reduce(function(s,e){ return s + (Number(e.twd_amount)||0); }, 0);
     var diff = totalBudget - totalCost;
     var grid = document.getElementById('statGrid');
     grid.innerHTML =
@@ -1207,10 +1050,6 @@
       '<div class="stat"><div class="stat-label">總預算</div><div class="stat-value">NT$ ' + fmtInt(totalBudget) + '</div></div>' +
       '<div class="stat"><div class="stat-label">總支出</div><div class="stat-value">NT$ ' + fmtInt(totalCost) + '</div></div>' +
       '<div class="stat"><div class="stat-label">總差異</div><div class="stat-value ' + (diff<0?'negative':'positive') + '">' + (diff<0?'−':'+') + 'NT$ ' + fmtInt(Math.abs(diff)) + '</div></div>';
-  }
-
-  function exhibitionCostByName(name){
-    return state.expenses.reduce(function(s,e){ return e.exhibitionName===name ? s+(Number(e.twd)||0) : s; }, 0);
   }
 
   function renderCharts(){
@@ -1231,7 +1070,7 @@
         data:{ labels: state.exhibitions.map(function(e){return e.name;}),
           datasets:[
             { label:'預算', data: state.exhibitions.map(function(e){return Number(e.budget)||0;}), backgroundColor:'#DCE2E8', borderRadius:4 },
-            { label:'支出', data: state.exhibitions.map(function(e){return exhibitionCostByName(e.name);}), backgroundColor:'#D02753', borderRadius:4 }
+            { label:'支出', data: state.exhibitions.map(function(e){return exhibitionCostById(e.id);}), backgroundColor:'#D02753', borderRadius:4 }
           ]},
         options:{ responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{family:"'Inter'",size:11} } } },
@@ -1241,7 +1080,7 @@
     }
 
     var catTotals = {};
-    state.expenses.forEach(function(e){ catTotals[e.category] = (catTotals[e.category]||0) + (Number(e.twd)||0); });
+    state.expenses.forEach(function(e){ catTotals[e.category] = (catTotals[e.category]||0) + (Number(e.twd_amount)||0); });
     var catKeys = Object.keys(catTotals);
     if(catKeys.length === 0){
       categoryCanvas.style.display='none';
@@ -1267,7 +1106,7 @@
     var html = '<div style="overflow-x:auto;"><table><thead><tr><th>展覽</th><th class="num">預算</th><th class="num">支出</th><th style="width:160px;">執行率</th><th class="num">差異</th></tr></thead><tbody>';
     state.exhibitions.forEach(function(ex){
       var budget = Number(ex.budget)||0;
-      var cost = exhibitionCostByName(ex.name);
+      var cost = exhibitionCostById(ex.id);
       var pct = budget > 0 ? Math.min(999, (cost/budget)*100) : (cost>0?100:0);
       var over = budget > 0 && cost > budget;
       var diff = budget - cost;
@@ -1289,28 +1128,38 @@
     renderDashExhibitionTable();
   }
 
+  // ---------------- PWA ----------------
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(){});
+    });
+  }
+
   // ---------------- Init ----------------
   async function init(){
     fillCategorySelect(document.getElementById('f_category'));
-    fillSelect(document.getElementById('f_applicant'), USERS, '請選擇申請人');
     fillCurrencySelect(document.getElementById('f_currency'));
     document.getElementById('f_currency').value = 'TWD';
     fillSelect(document.getElementById('f_payment'), PAYMENTS, '請選擇付款方式');
     fillSelect(document.getElementById('e_country'), COUNTRIES, '請選擇國家（選填）');
-    fillSelect(document.getElementById('u_role'), ROLES, '請選擇角色');
     updateRateButtonState();
     updateExpenseTypeState();
-    applyPermissionUI(); // 還沒連線時先套用一次，預設當作沒有權限（隱藏管理員/寫入功能）
 
-    try{ appsScriptUrl = localStorage.getItem(LS_URL_KEY) || DEFAULT_APPS_SCRIPT_URL || ''; }
-    catch(e){ appsScriptUrl = DEFAULT_APPS_SCRIPT_URL || ''; }
+    if(!IS_CONFIGURED){
+      showAuthScreen();
+      return;
+    }
 
-    try{
-      var cached = localStorage.getItem(LS_CACHE_KEY);
-      if(cached){ var c = JSON.parse(cached); state.exhibitions = c.exhibitions||[]; state.expenses = c.expenses||[]; state.currentUser = c.currentUser||null; }
-    }catch(e){}
+    supabase.auth.onAuthStateChange(function(event, session){
+      if(event === 'SIGNED_OUT') showAuthScreen();
+    });
 
-    await loadState();
+    var sessionRes = await supabase.auth.getSession();
+    if(sessionRes.data.session){
+      await afterLogin();
+    } else {
+      showAuthScreen();
+    }
   }
   init();
 
