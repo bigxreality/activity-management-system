@@ -1,0 +1,16 @@
+{
+  "name": "活動管理系統",
+  "short_name": "活動管理",
+  "description": "展覽費用管理、客戶名單 CRM、活動照片",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "background_color": "#161F29",
+  "theme_color": "#161F29",
+  "lang": "zh-Hant",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
