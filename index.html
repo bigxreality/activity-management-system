@@ -134,17 +134,22 @@
   .btn-ghost:hover{border-color:var(--ink-faint);color:var(--ink);}
   .btn-sm{padding:6px 12px;font-size:12.5px;}
   .form-msg{font-size:12.5px;color:var(--negative);min-height:16px;}
-  #attachPreviewList{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
   .attach-preview-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--radius-sm);padding:5px 9px;}
   .attach-preview-item button{margin-left:auto;}
   .attach-link{color:var(--accent-ink);text-decoration:none;font-size:12.5px;}
   .attach-link:hover{text-decoration:underline;}
-  .item-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;}
+  .item-row{border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;background:var(--surface-alt);}
   .item-row .field{margin-bottom:0;}
+  .item-row-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:10px;align-items:end;}
+  .item-row-footer{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px;gap:10px;flex-wrap:wrap;}
+  .item-row-footer > div{flex:1;min-width:200px;}
   .sub-form-heading{font-family:var(--font-display);font-size:13.5px;font-weight:600;margin:0 0 12px;}
   .sub-form-section{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);}
+  @media (max-width:820px){
+    .item-row-grid{grid-template-columns:repeat(2,1fr);}
+  }
   @media (max-width:520px){
-    .item-row{grid-template-columns:1fr;}
+    .item-row-grid{grid-template-columns:1fr;}
   }
 
   .toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
@@ -313,10 +318,6 @@
             <div class="rate-hint" id="rateHint"></div>
           </div>
           <div class="field">
-            <label>台幣金額合計（自動）</label>
-            <div class="field-computed" id="f_twd_preview">NT$ 0</div>
-          </div>
-          <div class="field">
             <label>付款方式</label>
             <select id="f_payment"></select>
           </div>
@@ -396,24 +397,26 @@
 
         <div class="sub-form-section">
           <h4 class="sub-form-heading">品項 <span class="req">*</span></h4>
+          <p class="hint" style="margin:0 0 12px;color:var(--ink-faint);font-size:12px;">每個品項各自的收據/發票照片，附件掛在品項上，不是掛在整張單據。</p>
           <div id="itemRowsWrap"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="addItemRowBtn">+ 新增品項</button>
+
+          <div style="display:flex;gap:24px;margin-top:16px;flex-wrap:wrap;">
+            <div class="field" style="min-width:160px;">
+              <label>外幣總額</label>
+              <div class="field-computed" id="f_amount_total_display">0</div>
+            </div>
+            <div class="field" style="min-width:160px;">
+              <label>台幣總額</label>
+              <div class="field-computed" id="f_twd_total_display">NT$ 0</div>
+            </div>
+          </div>
         </div>
 
         <div class="form-grid" style="margin-top:16px;">
-          <div class="field span-2">
+          <div class="field span-4">
             <label>備註</label>
             <input type="text" id="f_note" placeholder="選填">
-          </div>
-          <div class="field span-2">
-            <label>附件（收據/票根/發票，可複選，掛在整張單據上）</label>
-            <input type="file" id="f_attach_camera" accept="image/*" capture="environment" style="display:none;">
-            <input type="file" id="f_attach_files" accept="image/*" multiple style="display:none;">
-            <div style="display:flex;gap:8px;">
-              <button type="button" class="btn btn-ghost btn-sm" id="attachCameraBtn">📷 拍照</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="attachFilesBtn">📁 選擇檔案</button>
-            </div>
-            <div id="attachPreviewList"></div>
           </div>
         </div>
 
@@ -704,8 +707,6 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   var suppressAutoFetch = false;
   var budgetChartInst = null;
   var categoryChartInst = null;
-  var pendingAttachmentFiles = []; // File[]，還沒上傳的新附件
-  var existingAttachments = []; // string[]，編輯時已存在 Storage 的附件路徑（可移除）
   var editingLeadId = null;
   var currentDraftId = null;
   var currentDraftCreatedAt = null;
@@ -1019,47 +1020,133 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   var elDate = document.getElementById('f_date');
   elDate.value = new Date().toISOString().slice(0,10);
 
-  function updateTwdPreview(){
-    var rate = parseFloat(document.getElementById('f_rate').value) || 0;
-    var total = 0;
-    document.querySelectorAll('#itemRowsWrap .item-amount').forEach(function(inp){ total += parseFloat(inp.value) || 0; });
-    document.getElementById('f_twd_preview').textContent = 'NT$ ' + fmtInt(total * rate);
-  }
-  document.getElementById('f_rate').addEventListener('input', updateTwdPreview);
+  // ---------------- 品項（一張單據可以有多筆，附件掛在品項上） ----------------
+  var itemAttachState = {}; // itemId -> { pendingFiles: File[], existingPaths: string[] }
 
-  // ---------------- 品項（一張單據可以有多筆） ----------------
   function itemRowNode(values){
     values = values || {};
     var div = document.createElement('div');
     div.className = 'item-row';
+    div.dataset.itemId = values.id || crypto.randomUUID();
+    var currency = document.getElementById('f_currency').value || 'TWD';
     div.innerHTML =
-      '<div class="field"><label>品名摘要 <span class="req">*</span></label><input type="text" class="item-name" placeholder="例如：螢幕租借" value="' + escapeHtml(values.item||'') + '"></div>' +
-      '<div class="field"><label>金額 <span class="req">*</span></label><input type="number" class="item-amount" min="0" step="0.01" placeholder="0" value="' + (values.amount!=null?values.amount:'') + '"></div>' +
-      '<div class="field"><label>稅額（選填）</label><input type="number" class="item-tax" min="0" step="0.01" placeholder="0" value="' + (values.taxAmount!=null?values.taxAmount:'') + '"></div>' +
-      '<button type="button" class="icon-btn danger item-remove-btn">移除</button>';
+      '<div class="item-row-grid">' +
+        '<div class="field"><label>品名摘要 <span class="req">*</span></label><input type="text" class="item-name" placeholder="例如：螢幕租借" value="' + escapeHtml(values.item||'') + '"></div>' +
+        '<div class="field"><label class="item-currency-label">金額（' + escapeHtml(currency) + '） <span class="req">*</span></label><input type="number" class="item-amount" min="0" step="0.01" placeholder="0" value="' + (values.amount!=null?values.amount:'') + '"></div>' +
+        '<div class="field"><label>台幣金額</label><div class="field-computed item-twd-display">NT$ 0</div></div>' +
+        '<div class="field"><label>稅率（%）</label><input type="number" class="item-tax-rate" min="0" step="0.1" placeholder="0" value="' + (values.taxRate!=null?values.taxRate:0) + '"></div>' +
+        '<div class="field"><label>稅額</label><div class="field-computed item-tax-display">0</div></div>' +
+      '</div>' +
+      '<div class="item-row-footer">' +
+        '<div>' +
+          '<label style="font-size:12px;color:var(--ink-soft);font-weight:500;">附件</label><br>' +
+          '<input type="file" class="item-attach-camera-input" accept="image/*" capture="environment" style="display:none;">' +
+          '<input type="file" class="item-attach-files-input" accept="image/*" multiple style="display:none;">' +
+          '<div style="display:flex;gap:8px;margin-top:4px;">' +
+            '<button type="button" class="btn btn-ghost btn-sm item-attach-camera-btn">📷 拍照</button>' +
+            '<button type="button" class="btn btn-ghost btn-sm item-attach-files-btn">📁 選擇檔案</button>' +
+          '</div>' +
+          '<div class="item-attach-preview" style="margin-top:6px;"></div>' +
+        '</div>' +
+        '<button type="button" class="icon-btn danger item-remove-btn">移除這筆品項</button>' +
+      '</div>';
     return div;
   }
+
+  function updateItemComputedFields(row){
+    var amount = parseFloat(row.querySelector('.item-amount').value) || 0;
+    var taxRate = parseFloat(row.querySelector('.item-tax-rate').value) || 0;
+    var rate = parseFloat(document.getElementById('f_rate').value) || 0;
+    row.querySelector('.item-twd-display').textContent = 'NT$ ' + fmtInt(amount * rate);
+    row.querySelector('.item-tax-display').textContent = fmtNum(amount * taxRate / 100);
+  }
+
+  function updateItemsTotals(){
+    var rate = parseFloat(document.getElementById('f_rate').value) || 0;
+    var currency = document.getElementById('f_currency').value || 'TWD';
+    var totalAmount = 0;
+    document.querySelectorAll('#itemRowsWrap .item-amount').forEach(function(inp){ totalAmount += parseFloat(inp.value) || 0; });
+    document.getElementById('f_amount_total_display').textContent = fmtNum(totalAmount) + ' ' + currency;
+    document.getElementById('f_twd_total_display').textContent = 'NT$ ' + fmtInt(totalAmount * rate);
+  }
+
+  function refreshAllItemComputedFields(){
+    document.querySelectorAll('#itemRowsWrap .item-row').forEach(function(row){ updateItemComputedFields(row); });
+    updateItemsTotals();
+  }
+  function refreshAllItemCurrencyLabels(){
+    var currency = document.getElementById('f_currency').value || 'TWD';
+    document.querySelectorAll('#itemRowsWrap .item-currency-label').forEach(function(label){
+      label.innerHTML = '金額（' + escapeHtml(currency) + '） <span class="req">*</span>';
+    });
+    refreshAllItemComputedFields();
+  }
+  document.getElementById('f_rate').addEventListener('input', refreshAllItemComputedFields);
+
+  function renderItemAttachPreview(row, itemId){
+    var wrap = row.querySelector('.item-attach-preview');
+    var st = itemAttachState[itemId] || { pendingFiles: [], existingPaths: [] };
+    var items = [];
+    (st.existingPaths||[]).forEach(function(path, idx){
+      items.push('<div class="attach-preview-item">📎 ' + escapeHtml(path.split('/').pop()) +
+        '<button type="button" class="icon-btn danger btn-sm" data-remove-existing-idx="' + idx + '">移除</button></div>');
+    });
+    (st.pendingFiles||[]).forEach(function(file, idx){
+      items.push('<div class="attach-preview-item">🆕 ' + escapeHtml(file.name) +
+        '<button type="button" class="icon-btn danger btn-sm" data-remove-pending-idx="' + idx + '">移除</button></div>');
+    });
+    wrap.innerHTML = items.join('');
+    wrap.querySelectorAll('[data-remove-existing-idx]').forEach(function(b){
+      b.addEventListener('click', function(){ st.existingPaths.splice(parseInt(b.dataset.removeExistingIdx, 10), 1); renderItemAttachPreview(row, itemId); });
+    });
+    wrap.querySelectorAll('[data-remove-pending-idx]').forEach(function(b){
+      b.addEventListener('click', function(){ st.pendingFiles.splice(parseInt(b.dataset.removePendingIdx, 10), 1); renderItemAttachPreview(row, itemId); });
+    });
+  }
+
   function addItemRow(values){
     var wrap = document.getElementById('itemRowsWrap');
     var row = itemRowNode(values);
     wrap.appendChild(row);
-    row.querySelector('.item-amount').addEventListener('input', updateTwdPreview);
+    var itemId = row.dataset.itemId;
+    itemAttachState[itemId] = { pendingFiles: [], existingPaths: (values && values.attachments) ? values.attachments.slice() : [] };
+
+    row.querySelector('.item-amount').addEventListener('input', function(){ updateItemComputedFields(row); updateItemsTotals(); });
+    row.querySelector('.item-tax-rate').addEventListener('input', function(){ updateItemComputedFields(row); });
     row.querySelector('.item-remove-btn').addEventListener('click', function(){
       if(wrap.children.length <= 1){ toast('至少要保留一筆品項'); return; }
+      delete itemAttachState[itemId];
       row.remove();
-      updateTwdPreview();
+      updateItemsTotals();
     });
+    row.querySelector('.item-attach-camera-btn').addEventListener('click', function(){ row.querySelector('.item-attach-camera-input').click(); });
+    row.querySelector('.item-attach-files-btn').addEventListener('click', function(){ row.querySelector('.item-attach-files-input').click(); });
+    function handleItemAttachChange(ev){
+      var files = Array.prototype.slice.call(ev.target.files || []);
+      files.forEach(function(f){ itemAttachState[itemId].pendingFiles.push(f); });
+      ev.target.value = '';
+      renderItemAttachPreview(row, itemId);
+    }
+    row.querySelector('.item-attach-camera-input').addEventListener('change', handleItemAttachChange);
+    row.querySelector('.item-attach-files-input').addEventListener('change', handleItemAttachChange);
+
+    updateItemComputedFields(row);
+    renderItemAttachPreview(row, itemId);
+    updateItemsTotals();
   }
-  function clearItemRows(){ document.getElementById('itemRowsWrap').innerHTML = ''; }
+  function clearItemRows(){
+    document.getElementById('itemRowsWrap').innerHTML = '';
+    itemAttachState = {};
+  }
   function getItemRowsData(){
     var rows = Array.prototype.slice.call(document.querySelectorAll('#itemRowsWrap .item-row'));
     var result = [];
     rows.forEach(function(row){
       var item = row.querySelector('.item-name').value.trim();
       var amountStr = row.querySelector('.item-amount').value;
-      var taxStr = row.querySelector('.item-tax').value;
+      var taxRateStr = row.querySelector('.item-tax-rate').value;
       if(!item && !amountStr) return; // 跳過完全空白的多餘列
-      result.push({ item: item, amount: parseFloat(amountStr), taxAmount: taxStr ? parseFloat(taxStr) : 0 });
+      result.push({ id: row.dataset.itemId, item: item, amount: parseFloat(amountStr), taxRate: taxRateStr ? parseFloat(taxRateStr) : 0 });
     });
     return result;
   }
@@ -1166,7 +1253,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         hint.textContent = '';
       }
     }
-    updateTwdPreview();
+    refreshAllItemCurrencyLabels();
   }
   document.getElementById('f_currency').addEventListener('change', updateRateButtonState);
   document.getElementById('f_date').addEventListener('change', function(){
@@ -1200,7 +1287,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         // 財務核算用「現金賣出價」當預設值，不是即期賣出；欄位隨時可以手動覆蓋修改
         var rate = data.cashSell || data.spotSell || data.cashBuy || data.spotBuy;
         document.getElementById('f_rate').value = rate;
-        updateTwdPreview();
+        refreshAllItemComputedFields();
         hint.textContent = '現金賣出 ' + fmtNum(data.cashSell,4) + '（已帶入）　即期賣出 ' + fmtNum(data.spotSell,4) +
           (data.usedFallback ? '（' + date + ' 無資料，改用 ' + data.date + ' 匯率）' : '（' + data.date + '）');
       }
@@ -1212,58 +1299,23 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
   document.getElementById('fetchRateBtn').addEventListener('click', fetchRate);
 
-  // ---------------- 附件（收據/發票） ----------------
-  // 「拍照」跟「選擇檔案」兩個輸入最後都導向同一個 pendingAttachmentFiles 清單，
-  // 實際上傳延到表單送出時才做（那時候才確定要用哪個 expense id 當資料夾名稱）。
-  document.getElementById('attachCameraBtn').addEventListener('click', function(){
-    document.getElementById('f_attach_camera').click();
-  });
-  document.getElementById('attachFilesBtn').addEventListener('click', function(){
-    document.getElementById('f_attach_files').click();
-  });
-  function handleAttachInputChange(ev){
-    var files = Array.prototype.slice.call(ev.target.files || []);
-    files.forEach(function(f){ pendingAttachmentFiles.push(f); });
-    ev.target.value = ''; // 清空，這樣同一個檔案可以再選一次
-    renderAttachPreview();
-  }
-  document.getElementById('f_attach_camera').addEventListener('change', handleAttachInputChange);
-  document.getElementById('f_attach_files').addEventListener('change', handleAttachInputChange);
-
-  function renderAttachPreview(){
-    var wrap = document.getElementById('attachPreviewList');
-    var items = [];
-    existingAttachments.forEach(function(path, idx){
-      items.push('<div class="attach-preview-item">📎 ' + escapeHtml(path.split('/').pop()) +
-        '<button type="button" class="icon-btn danger btn-sm" data-remove-existing="' + idx + '">移除</button></div>');
-    });
-    pendingAttachmentFiles.forEach(function(file, idx){
-      items.push('<div class="attach-preview-item">🆕 ' + escapeHtml(file.name) +
-        '<button type="button" class="icon-btn danger btn-sm" data-remove-pending="' + idx + '">移除</button></div>');
-    });
-    wrap.innerHTML = items.join('');
-    wrap.querySelectorAll('[data-remove-existing]').forEach(function(b){
-      b.addEventListener('click', function(){ existingAttachments.splice(parseInt(b.dataset.removeExisting, 10), 1); renderAttachPreview(); });
-    });
-    wrap.querySelectorAll('[data-remove-pending]').forEach(function(b){
-      b.addEventListener('click', function(){ pendingAttachmentFiles.splice(parseInt(b.dataset.removePending, 10), 1); renderAttachPreview(); });
-    });
-  }
-
+  // ---------------- 附件（收據/發票，掛在品項上） ----------------
   function sanitizeFilename(name){
     return String(name).replace(/[^a-zA-Z0-9.\-_]/g, '_');
   }
 
-  async function uploadPendingAttachments(expenseId){
+  // 每個品項各自的附件上傳到 {單據id}/{品項id}/... 底下
+  async function uploadItemAttachments(documentId, itemId){
+    var st = itemAttachState[itemId] || { pendingFiles: [], existingPaths: [] };
     var uploadedPaths = [];
-    for(var i = 0; i < pendingAttachmentFiles.length; i++){
-      var file = pendingAttachmentFiles[i];
-      var path = expenseId + '/' + Date.now() + '_' + i + '_' + sanitizeFilename(file.name);
+    for(var i = 0; i < st.pendingFiles.length; i++){
+      var file = st.pendingFiles[i];
+      var path = documentId + '/' + itemId + '/' + Date.now() + '_' + i + '_' + sanitizeFilename(file.name);
       var res = await supabase.storage.from('attachments').upload(path, file, { upsert: false });
       if(res.error) throw new Error('附件「' + file.name + '」上傳失敗：' + res.error.message);
       uploadedPaths.push(path);
     }
-    return uploadedPaths;
+    return (st.existingPaths || []).concat(uploadedPaths);
   }
 
   async function openAttachment(path){
@@ -1284,13 +1336,9 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     updateExpenseTypeState();
     clearItemRows();
     addItemRow();
-    updateTwdPreview();
     hidePayeePanel();
     renderPayeeInfo();
     editingExpenseId = null;
-    pendingAttachmentFiles = [];
-    existingAttachments = [];
-    renderAttachPreview();
     document.getElementById('expenseSubmitBtn').textContent = '新增單據';
     document.getElementById('expenseCancelBtn').style.display = 'none';
     document.getElementById('expenseFormMsg').textContent = '';
@@ -1340,35 +1388,43 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     showLoading(true);
     try{
       var documentId = editingExpenseId || crypto.randomUUID();
-      var newPaths = await uploadPendingAttachments(documentId);
-      var finalAttachments = existingAttachments.concat(newPaths);
-      payload.attachments = finalAttachments;
 
       var res;
-      var removedPaths = [];
       if(editingExpenseId){
-        var rec = state.documents.find(function(x){ return x.id === editingExpenseId; });
-        removedPaths = (rec && rec.attachments || []).filter(function(p){ return finalAttachments.indexOf(p) === -1; });
         res = await supabase.from('expense_documents').update(payload).eq('id', editingExpenseId);
-        if(res.error) throw res.error;
-        var delRes = await supabase.from('expense_items').delete().eq('document_id', editingExpenseId);
-        if(delRes.error) throw delRes.error;
       } else {
         payload.id = documentId;
         payload.created_by = currentUser.id;
         res = await supabase.from('expense_documents').insert(payload);
-        if(res.error) throw res.error;
       }
+      if(res.error) throw res.error;
 
-      var itemsPayload = items.map(function(it, idx){
-        return { document_id: documentId, item: it.item, amount: it.amount, tax_amount: it.taxAmount || 0, sort_order: idx };
-      });
-      var itemsRes = await supabase.from('expense_items').insert(itemsPayload);
+      // 每個品項各自上傳自己的附件，再組成要 upsert 的品項資料
+      // （品項 id 是新增列時就先產生好的，編輯既有品項時沿用原本 id，
+      // 這樣附件的 Storage 路徑才不會因為每次編輯就整批換掉）
+      var itemsPayload = [];
+      for(var i = 0; i < items.length; i++){
+        var it = items[i];
+        var attachments = await uploadItemAttachments(documentId, it.id);
+        itemsPayload.push({ id: it.id, document_id: documentId, item: it.item, amount: it.amount, tax_rate: it.taxRate || 0, attachments: attachments, sort_order: i });
+      }
+      var itemsRes = await supabase.from('expense_items').upsert(itemsPayload);
       if(itemsRes.error) throw itemsRes.error;
 
-      if(removedPaths.length){
-        supabase.storage.from('attachments').remove(removedPaths).catch(function(){}); // 清理舊檔案，失敗不影響主流程
+      // 編輯時，比對哪些原本的品項在這次表單裡被移除了，刪除資料庫紀錄並清掉對應附件
+      if(editingExpenseId){
+        var rec = state.documents.find(function(x){ return x.id === editingExpenseId; });
+        var currentIds = itemsPayload.map(function(p){ return p.id; });
+        var removedItems = (rec && rec.items || []).filter(function(oldIt){ return currentIds.indexOf(oldIt.id) === -1; });
+        if(removedItems.length){
+          var removedIds = removedItems.map(function(x){ return x.id; });
+          await supabase.from('expense_items').delete().in('id', removedIds);
+          var filesToRemove = [];
+          removedItems.forEach(function(oldIt){ (oldIt.attachments || []).forEach(function(p){ filesToRemove.push(p); }); });
+          if(filesToRemove.length) supabase.storage.from('attachments').remove(filesToRemove).catch(function(){});
+        }
       }
+
       toast(editingExpenseId ? '已更新單據' : '已新增單據');
       resetExpenseForm();
       await loadState();
@@ -1406,26 +1462,24 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     clearItemRows();
     var items = (rec.items || []).slice().sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); });
     if(items.length === 0){ addItemRow(); }
-    else { items.forEach(function(it){ addItemRow({ item: it.item, amount: it.amount, taxAmount: it.tax_amount }); }); }
-    updateTwdPreview();
+    else { items.forEach(function(it){ addItemRow({ id: it.id, item: it.item, amount: it.amount, taxRate: it.tax_rate, attachments: it.attachments }); }); }
     suppressAutoFetch = false;
-    pendingAttachmentFiles = [];
-    existingAttachments = (rec.attachments || []).slice();
-    renderAttachPreview();
     document.getElementById('expenseSubmitBtn').textContent = '更新單據';
     document.getElementById('expenseCancelBtn').style.display = 'inline-block';
     document.getElementById('expenseFormCard').scrollIntoView({behavior:'smooth', block:'start'});
   }
 
   async function deleteExpense(id){
-    if(!confirm('確定要刪除這筆單據嗎？（底下的品項會一併刪除）')) return;
+    if(!confirm('確定要刪除這筆單據嗎？（底下的品項與附件會一併刪除）')) return;
     var rec = state.documents.find(function(x){ return x.id === id; });
     showLoading(true);
     try{
       var res = await supabase.from('expense_documents').delete().eq('id', id);
       if(res.error) throw res.error;
-      if(rec && rec.attachments && rec.attachments.length){
-        supabase.storage.from('attachments').remove(rec.attachments).catch(function(){}); // 一併清掉附件檔案，失敗不影響主流程
+      var filesToRemove = [];
+      (rec && rec.items || []).forEach(function(it){ (it.attachments || []).forEach(function(p){ filesToRemove.push(p); }); });
+      if(filesToRemove.length){
+        supabase.storage.from('attachments').remove(filesToRemove).catch(function(){}); // 一併清掉附件檔案，失敗不影響主流程
       }
       await loadState();
       toast('已刪除');
@@ -1480,14 +1534,14 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         '<td class="num" style="font-weight:600;">NT$ ' + fmtInt(twdTotal) + '</td>' +
         '<td>' + escapeHtml(r.payment_method||'—') + '</td>' +
         '<td>' + escapeHtml(r.invoice_no||'—') + '</td>' +
-        '<td>' + renderAttachmentLinks(r.attachments) + '</td>' +
+        '<td>' + documentAttachmentCount(items) + '</td>' +
         (writable ? ('<td><div class="row-actions">' +
           '<button class="icon-btn" data-edit="' + r.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-del="' + r.id + '">刪除</button>' +
         '</div></td>') : '') + '</tr>';
       html += '<tr class="item-detail-row" data-items-row="' + r.id + '" style="display:none;">' +
         '<td colspan="' + colspan + '" style="background:var(--surface-alt);padding:0;">' +
-        renderItemsSubtable(items, r.currency) +
+        renderItemsSubtable(items, r.currency, r.rate) +
         '</td></tr>';
     });
     html += '</tbody></table></div>';
@@ -1509,13 +1563,22 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     });
   }
 
-  function renderItemsSubtable(items, currency){
+  function documentAttachmentCount(items){
+    var n = (items || []).reduce(function(s,it){ return s + ((it.attachments||[]).length); }, 0);
+    return n > 0 ? ('📎 ' + n) : '<span style="color:var(--ink-faint);">—</span>';
+  }
+
+  function renderItemsSubtable(items, currency, rate){
     if(!items || items.length === 0) return '<div style="padding:10px 16px;color:var(--ink-faint);font-size:12.5px;">尚無品項</div>';
-    var html = '<table style="margin:0;"><thead><tr><th style="padding-left:40px;">品名摘要</th><th class="num">金額</th><th class="num">稅額</th></tr></thead><tbody>';
+    var html = '<table style="margin:0;"><thead><tr><th style="padding-left:40px;">品名摘要</th><th class="num">金額</th><th class="num">台幣金額</th><th class="num">稅率</th><th class="num">稅額</th><th>附件</th></tr></thead><tbody>';
     items.slice().sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); }).forEach(function(it){
+      var twd = (Number(it.amount)||0) * (Number(rate)||0);
       html += '<tr><td style="padding-left:40px;">' + escapeHtml(it.item) + '</td>' +
         '<td class="num">' + fmtNum(it.amount) + ' ' + escapeHtml(currency) + '</td>' +
-        '<td class="num">' + (it.tax_amount ? fmtNum(it.tax_amount) : '—') + '</td></tr>';
+        '<td class="num">NT$ ' + fmtInt(twd) + '</td>' +
+        '<td class="num">' + (it.tax_rate ? fmtNum(it.tax_rate,1) + '%' : '—') + '</td>' +
+        '<td class="num">' + (it.tax_amount ? fmtNum(it.tax_amount) : '—') + '</td>' +
+        '<td>' + renderAttachmentLinks(it.attachments) + '</td></tr>';
     });
     html += '</tbody></table>';
     return html;
@@ -1532,15 +1595,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var filterId = document.getElementById('expenseFilter').value;
     var rows = state.documents.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
-    var header = ['展覽','日期','費用類別','費用類型','申請人','廠商','起點','迄點','品名摘要','原幣金額','稅額','幣別','匯率','台幣金額','付款方式','發票號碼','備註'];
+    var header = ['展覽','日期','費用類別','費用類型','申請人','廠商','起點','迄點','品名摘要','原幣金額','稅率(%)','稅額','幣別','匯率','台幣金額','付款方式','發票號碼','備註'];
     var lines = [header.join(',')];
     rows.forEach(function(r){
-      var items = (r.items && r.items.length) ? r.items : [{ item:'', amount:0, tax_amount:0 }];
+      var items = (r.items && r.items.length) ? r.items : [{ item:'', amount:0, tax_rate:0, tax_amount:0 }];
       items.forEach(function(it){
         var line = [
           r.exhibition && r.exhibition.name, r.date, r.category, r.expense_type,
           r.applicant && r.applicant.name, r.vendor, r.route_from, r.route_to,
-          it.item, it.amount, it.tax_amount, r.currency, r.rate, (Number(it.amount)||0) * (Number(r.rate)||0),
+          it.item, it.amount, it.tax_rate, it.tax_amount, r.currency, r.rate, (Number(it.amount)||0) * (Number(r.rate)||0),
           r.payment_method, r.invoice_no, r.note
         ].map(function(v){ v = (v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(v) ? '"' + v + '"' : v; });
         lines.push(line.join(','));
@@ -2398,7 +2461,6 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     addItemRow();
     updateRateButtonState();
     updateExpenseTypeState();
-    updateTwdPreview();
 
     if(!IS_CONFIGURED){
       showAuthScreen();
