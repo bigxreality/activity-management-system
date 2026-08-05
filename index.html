@@ -227,7 +227,7 @@
       <button data-view="dashboard" class="active">儀表板</button>
       <button data-view="expenses">費用明細</button>
       <button data-view="exhibitions">展覽總覽</button>
-      <button data-view="leads">客戶名單</button>
+      <button data-view="contacts">客戶名單</button>
       <button data-view="users" id="usersTabBtn" style="display:none;">使用者管理</button>
     </nav>
     <span class="user-chip"><span class="status-dot ok"></span><span id="userNameLabel"></span><span class="role-tag" id="userRoleLabel"></span></span>
@@ -489,112 +489,174 @@
     <div class="card"><div id="exhibitionTableWrap"></div></div>
   </section>
 
-  <!-- ============ CRM LEADS ============ -->
-  <section id="view-leads" class="view">
+  <!-- ============ CRM CONTACTS ============ -->
+  <section id="view-contacts" class="view">
     <h2 class="view-title">客戶名單 CRM</h2>
-    <p class="view-desc">展覽收集到的名單管理，含聯繫追蹤紀錄與名單價值分數。</p>
+    <p class="view-desc">公司與聯絡人管理，含聯繫追蹤、待辦事項與聯絡人價值分數。</p>
 
     <details class="card card-pad form-card" id="weightsFormCard" style="display:none;">
       <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">身份權重設定（僅管理員）</summary>
-      <p class="hint" style="margin:8px 0 0;color:var(--ink-faint);font-size:12px;">名單價值分數 = 身份權重 × 部門相關度 × (積極度＋成交機率感覺) ÷ 2</p>
+      <p class="hint" style="margin:8px 0 0;color:var(--ink-faint);font-size:12px;">聯絡人價值分數 = 身份權重 × 部門相關度 × (積極度＋成交機率感覺) ÷ 2</p>
       <div id="weightsTableWrap" style="margin-top:12px;"></div>
     </details>
 
-    <div class="card card-pad form-card" id="draftsEntryCard" style="display:none;">
-      <button type="button" class="btn btn-ghost btn-sm" id="draftsToggleBtn">暫存的草稿（0）</button>
-      <div id="draftsListWrap" style="display:none;margin-top:12px;"></div>
-    </div>
+    <details class="card card-pad form-card" id="productsFormCard" style="display:none;">
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">產品管理（僅管理員）</summary>
+      <div id="productsTableWrap" style="margin-top:12px;"></div>
+      <div class="form-grid" style="grid-template-columns:2fr 1fr auto;margin-top:12px;">
+        <div class="field"><label>新產品名稱</label><input type="text" id="newProductName"></div>
+        <div class="field"><label>排序</label><input type="number" id="newProductSort" value="0" step="1"></div>
+        <div class="field" style="justify-content:flex-end;"><button type="button" class="btn btn-primary btn-sm" id="addProductBtn">新增產品</button></div>
+      </div>
+      <span class="form-msg" id="productFormMsg"></span>
+    </details>
 
-    <details class="card card-pad form-card" id="leadFormCard" open>
-      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增名單</summary>
-      <form id="leadForm">
+    <details class="card card-pad form-card" id="companyFormCard">
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">公司管理</summary>
+      <div id="companiesTableWrap" style="margin-top:12px;"></div>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="field"><label>公司名稱（原文）</label><input type="text" id="co_name_original" class="rtl-aware"></div>
+        <div class="field"><label>公司名稱（英文）</label><input type="text" id="co_name_english"></div>
+        <div class="field"><label>網站</label><input type="text" id="co_website" placeholder="https://..."></div>
+        <div class="field"><label>國家</label><input type="text" id="co_country"></div>
+        <div class="field span-2"><label>地址（原文）</label><input type="text" id="co_address_original" class="rtl-aware"></div>
+        <div class="field span-2"><label>地址（英文）</label><input type="text" id="co_address_english"></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary btn-sm" id="saveCompanyBtn">新增公司</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="cancelCompanyBtn" style="display:none;">取消編輯</button>
+        <span class="form-msg" id="companyFormMsg"></span>
+      </div>
+    </details>
+
+    <details class="card card-pad form-card" id="contactFormCard" open>
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增聯絡人</summary>
+      <form id="contactForm">
         <div class="form-grid">
           <div class="field">
-            <label>姓名 <span class="req">*</span></label>
-            <input type="text" id="l_name" required>
-          </div>
-          <div class="field">
-            <label>公司</label>
-            <input type="text" id="l_company">
-          </div>
-          <div class="field">
-            <label>職稱</label>
-            <input type="text" id="l_title">
-          </div>
-          <div class="field">
-            <label>聯絡方式</label>
-            <input type="text" id="l_contact_info" placeholder="電話／Email">
-          </div>
-          <div class="field">
             <label>來源展覽</label>
-            <select id="l_source_exhibition"></select>
+            <select id="c_source_exhibition"></select>
+          </div>
+          <div class="field span-2">
+            <label>公司</label>
+            <select id="c_company"></select>
+          </div>
+          <div class="field">
+            <label>重要程度</label>
+            <select id="c_importance">
+              <option value="未分類">未分類</option>
+              <option value="A">A（高度優先）</option>
+              <option value="B">B（值得追蹤）</option>
+              <option value="C">C（一般聯絡）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>姓名（原文） <span class="req">*</span></label>
+            <input type="text" id="c_name_original" class="rtl-aware">
+          </div>
+          <div class="field">
+            <label>姓名（英文）</label>
+            <input type="text" id="c_name_english">
+          </div>
+          <div class="field">
+            <label>客戶類型</label>
+            <input type="text" id="c_customer_type" list="customerTypeOptions" placeholder="可自訂輸入">
+            <datalist id="customerTypeOptions">
+              <option value="代理商"><option value="經銷商"><option value="系統整合商">
+              <option value="政府單位"><option value="軍警單位"><option value="消防防災單位">
+              <option value="教育研究單位"><option value="合作夥伴"><option value="供應商">
+              <option value="媒體"><option value="終端客戶"><option value="其他">
+            </datalist>
+          </div>
+          <div class="field">
+            <label>部門（原文）</label>
+            <input type="text" id="c_department_original" class="rtl-aware">
+          </div>
+          <div class="field">
+            <label>部門（英文）</label>
+            <input type="text" id="c_department_english">
+          </div>
+          <div class="field">
+            <label>職稱（原文）</label>
+            <input type="text" id="c_title_original" class="rtl-aware">
+          </div>
+          <div class="field">
+            <label>職稱（英文）</label>
+            <input type="text" id="c_title_english">
+          </div>
+          <div class="field">
+            <label>國家</label>
+            <input type="text" id="c_country">
+          </div>
+          <div class="field span-2">
+            <label>地址（原文）</label>
+            <input type="text" id="c_address_original" class="rtl-aware">
+          </div>
+          <div class="field span-2">
+            <label>地址（英文）</label>
+            <input type="text" id="c_address_english">
           </div>
           <div class="field">
             <label>身份類別</label>
-            <select id="l_identity_category"></select>
+            <select id="c_identity_category"></select>
           </div>
           <div class="field">
             <label>部門相關度</label>
-            <select id="l_department_relevance"></select>
+            <select id="c_department_relevance"></select>
           </div>
           <div class="field">
             <label>積極度</label>
-            <select id="l_enthusiasm"></select>
+            <select id="c_enthusiasm"></select>
           </div>
           <div class="field">
             <label>成交機率感覺</label>
-            <select id="l_close_probability"></select>
+            <select id="c_close_probability"></select>
           </div>
           <div class="field">
             <label>目前狀態</label>
-            <select id="l_status"></select>
+            <select id="c_status"></select>
           </div>
           <div class="field">
             <label>成交金額</label>
-            <input type="number" id="l_deal_amount" min="0" step="1" placeholder="狀態為已成交才需要">
+            <input type="number" id="c_deal_amount" min="0" step="1" placeholder="狀態為已成交才需要">
           </div>
           <div class="field">
             <label>成交日期</label>
-            <input type="date" id="l_deal_date">
+            <input type="date" id="c_deal_date">
           </div>
           <div class="field">
             <label>負責業務</label>
-            <select id="l_owner"></select>
+            <select id="c_owner"></select>
           </div>
+        </div>
+
+        <div class="sub-form-section">
+          <h4 class="sub-form-heading">聯絡方式</h4>
+          <div id="contactMethodRowsWrap"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="addContactMethodRowBtn">+ 新增聯絡方式</button>
         </div>
 
         <div class="form-grid" style="margin-top:16px;">
           <div class="field span-2">
-            <label>名片照片</label>
-            <input type="file" id="l_card_camera" accept="image/*" capture="environment" style="display:none;">
-            <input type="file" id="l_card_files" accept="image/*" style="display:none;">
-            <div style="display:flex;gap:8px;">
-              <button type="button" class="btn btn-ghost btn-sm" id="cardCameraBtn">📷 拍照</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="cardFilesBtn">📁 選擇檔案</button>
-            </div>
-            <div id="cardPhotoPreview" style="margin-top:8px;"></div>
-          </div>
-          <div class="field span-2">
             <label>客戶頭像</label>
-            <input type="file" id="l_avatar_camera" accept="image/*" capture="environment" style="display:none;">
-            <input type="file" id="l_avatar_files" accept="image/*" style="display:none;">
+            <input type="file" id="c_avatar_camera" accept="image/*" capture="environment" style="display:none;">
+            <input type="file" id="c_avatar_files" accept="image/*" style="display:none;">
             <div style="display:flex;gap:8px;">
               <button type="button" class="btn btn-ghost btn-sm" id="avatarCameraBtn">📷 拍照</button>
               <button type="button" class="btn btn-ghost btn-sm" id="avatarFilesBtn">📁 選擇檔案</button>
             </div>
             <div id="avatarPhotoPreview" style="margin-top:8px;"></div>
           </div>
-          <div class="field span-4">
+          <div class="field span-2">
             <label>備註</label>
-            <input type="text" id="l_note" placeholder="選填">
+            <input type="text" id="c_note" placeholder="選填">
           </div>
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary" id="leadSubmitBtn">新增名單</button>
-          <button type="button" class="btn btn-ghost" id="saveDraftBtn">暫存</button>
-          <button type="button" class="btn btn-ghost" id="leadCancelBtn" style="display:none;">取消編輯</button>
-          <span class="form-msg" id="leadFormMsg"></span>
+          <button type="submit" class="btn btn-primary" id="contactSubmitBtn">新增聯絡人</button>
+          <button type="button" class="btn btn-ghost" id="contactCancelBtn" style="display:none;">取消編輯</button>
+          <span class="form-msg" id="contactFormMsg"></span>
         </div>
       </form>
     </details>
@@ -602,22 +664,24 @@
     <div class="card">
       <div class="card-pad" style="padding-bottom:0;">
         <div class="toolbar">
-          <div class="toolbar-left">
-            <select id="leadFilterExhibition"><option value="">全部展覽</option></select>
-            <select id="leadFilterOwner"><option value="">全部負責業務</option></select>
-            <select id="leadFilterStatus">
+          <div class="toolbar-left" style="flex-wrap:wrap;">
+            <input type="text" id="contactSearchInput" placeholder="搜尋姓名/公司/Email/電話" style="border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 10px;font-size:13px;">
+            <select id="contactFilterExhibition"><option value="">全部展覽</option></select>
+            <select id="contactFilterOwner"><option value="">全部負責業務</option></select>
+            <select id="contactFilterImportance">
+              <option value="">全部重要程度</option>
+              <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="未分類">未分類</option>
+            </select>
+            <select id="contactFilterStatus">
               <option value="">全部狀態</option>
-              <option value="新名單">新名單</option>
-              <option value="追蹤中">追蹤中</option>
-              <option value="已報價">已報價</option>
-              <option value="已成交">已成交</option>
-              <option value="已流失">已流失</option>
+              <option value="新名單">新名單</option><option value="追蹤中">追蹤中</option>
+              <option value="已報價">已報價</option><option value="已成交">已成交</option><option value="已流失">已流失</option>
             </select>
           </div>
-          <button class="btn btn-ghost btn-sm" id="leadsRefreshBtn">重新整理</button>
+          <button class="btn btn-ghost btn-sm" id="contactsRefreshBtn">重新整理</button>
         </div>
       </div>
-      <div id="leadsTableWrap"></div>
+      <div id="contactsTableWrap"></div>
     </div>
   </section>
 
@@ -700,20 +764,21 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   // ---------------- State ----------------
-  var state = { exhibitions: [], documents: [], profiles: [], payees: [], leads: [], identityWeights: [] };
+  var state = { exhibitions: [], documents: [], profiles: [], payees: [], identityWeights: [], products: [], companies: [], contacts: [] };
   var currentUser = null; // { id, email, name, role }
   var editingExpenseId = null;
   var editingExhibitionId = null;
   var suppressAutoFetch = false;
   var budgetChartInst = null;
   var categoryChartInst = null;
-  var editingLeadId = null;
-  var currentDraftId = null;
-  var currentDraftCreatedAt = null;
-  var expandedLeadIds = {};
-  var LEAD_STATUSES = ["新名單","追蹤中","已報價","已成交","已流失"];
+  var editingContactId = null;
+  var editingCompanyId = null;
+  var expandedContactIds = {};
+  var CONTACT_STATUSES = ["新名單","追蹤中","已報價","已成交","已流失"];
+  var CONTACT_METHOD_TYPES = ['email','mobile','office_phone','fax','website','LINE','WhatsApp','WeChat','LinkedIn','other'];
+  var CONTACT_METHOD_LABELS = { email:'Email', mobile:'手機', office_phone:'公司電話', fax:'傳真', website:'網站', LINE:'LINE', WhatsApp:'WhatsApp', WeChat:'WeChat', LinkedIn:'LinkedIn', other:'其他' };
+  var RTL_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
   var photoState = {
-    card: { pendingFile: null, existingPath: null, removed: false },
     avatar: { pendingFile: null, existingPath: null, removed: false }
   };
 
@@ -805,8 +870,10 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('exhibitionFormCard').style.display = isViewer ? 'none' : '';
     document.getElementById('exportCsvBtn').style.display = isViewer ? 'none' : '';
     document.getElementById('usersTabBtn').style.display = isAdmin ? '' : 'none';
-    document.getElementById('leadFormCard').style.display = isViewer ? 'none' : '';
+    document.getElementById('contactFormCard').style.display = isViewer ? 'none' : '';
+    document.getElementById('companyFormCard').style.display = isViewer ? 'none' : '';
     document.getElementById('weightsFormCard').style.display = isAdmin ? '' : 'none';
+    document.getElementById('productsFormCard').style.display = isAdmin ? '' : 'none';
   }
 
   function canWrite(){
@@ -822,7 +889,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if(btn.dataset.view === 'dashboard') renderDashboard();
       if(btn.dataset.view === 'users') renderUsersTable();
-      if(btn.dataset.view === 'leads'){ renderLeadsTable(); renderWeightsTable(); renderDraftsEntry(); }
+      if(btn.dataset.view === 'contacts'){ renderContactsTable(); renderWeightsTable(); renderProductsTable(); renderCompaniesTable(); }
     });
   });
 
@@ -952,10 +1019,16 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(payeeRes.error) throw payeeRes.error;
       var weightsRes = await supabase.from('identity_weights').select('*').order('category');
       if(weightsRes.error) throw weightsRes.error;
-      var leadsRes = await supabase.from('leads')
-        .select('*, exhibition:exhibitions!source_exhibition_id(id,name), owner:profiles!owner_id(id,name), contact_logs(*)')
+      var productsRes = await supabase.from('products').select('*').order('sort_order');
+      if(productsRes.error) throw productsRes.error;
+      var companiesRes = await supabase.from('companies').select('*').order('name_original');
+      if(companiesRes.error) throw companiesRes.error;
+      var contactsRes = await supabase.from('contacts')
+        .select('*, company:companies(*), owner:profiles!owner_id(id,name), contact_methods(*), ' +
+          'event_contacts(exhibition_id, interested_products, onsite_notes, next_action, exhibition:exhibitions(id,name)), ' +
+          'interactions(*), tasks(*)')
         .order('created_at', { ascending:false });
-      if(leadsRes.error) throw leadsRes.error;
+      if(contactsRes.error) throw contactsRes.error;
 
       state.exhibitions = exRes.data || [];
       state.documents = (docRes.data || []).map(function(d){
@@ -965,12 +1038,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       state.profiles = profRes.data || [];
       state.payees = payeeRes.data || [];
       state.identityWeights = weightsRes.data || [];
+      state.products = productsRes.data || [];
+      state.companies = companiesRes.data || [];
       var weightsMap = {};
       state.identityWeights.forEach(function(w){ weightsMap[w.category] = w.weight; });
-      state.leads = (leadsRes.data || []).map(function(l){
-        l.lead_score = computeLeadScore(l, weightsMap);
-        l.contact_logs = (l.contact_logs || []).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-        return l;
+      state.contacts = (contactsRes.data || []).map(function(c){
+        c.contact_score = computeContactScore(c, weightsMap);
+        c.interactions = (c.interactions || []).slice().sort(function(a,b){ return (b.interaction_date||'').localeCompare(a.interaction_date||''); });
+        c.tasks = (c.tasks || []).slice().sort(function(a,b){ return (a.due_date||'').localeCompare(b.due_date||''); });
+        return c;
       });
       renderAll();
     }catch(err){
@@ -987,11 +1063,11 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     if(!res.error) state.payees = res.data || [];
   }
 
-  function computeLeadScore(lead, weightsMap){
-    if(lead.department_relevance == null || lead.enthusiasm == null || lead.close_probability == null) return null;
-    var w = weightsMap[lead.identity_category];
+  function computeContactScore(contact, weightsMap){
+    if(contact.department_relevance == null || contact.enthusiasm == null || contact.close_probability == null) return null;
+    var w = weightsMap[contact.identity_category];
     if(w == null) w = 1;
-    return w * lead.department_relevance * (lead.enthusiasm + lead.close_probability) / 2;
+    return w * contact.department_relevance * (contact.enthusiasm + contact.close_probability) / 2;
   }
 
   function renderAll(){
@@ -999,16 +1075,17 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     refreshExhibitionSelects();
     refreshApplicantSelect();
     refreshPayeeSelect();
-    refreshLeadFormSelects();
-    refreshLeadFilterSelects();
+    refreshContactFormSelects();
+    refreshContactFilterSelects();
     renderExpenseTable();
     renderExhibitionTable();
     renderDashboard();
-    if(document.getElementById('view-leads').classList.contains('active')){
-      renderLeadsTable();
+    if(document.getElementById('view-contacts').classList.contains('active')){
+      renderContactsTable();
       renderWeightsTable();
+      renderProductsTable();
+      renderCompaniesTable();
     }
-    renderDraftsEntry();
     if(currentUser && currentUser.role === 'admin' && document.getElementById('view-users').classList.contains('active')){
       renderUsersTable();
     }
@@ -1732,131 +1809,17 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     wrap.querySelectorAll('[data-edel]').forEach(function(b){ b.addEventListener('click', function(){ deleteExhibition(b.dataset.edel); }); });
   }
 
-  // ---------------- CRM：草稿暫存（IndexedDB，純本機，不進 Supabase） ----------------
-  var DRAFT_DB_NAME = 'activityMgmtDrafts';
-  var DRAFT_STORE_NAME = 'leadDrafts';
-  var draftDbPromise = null;
-  function openDraftDb(){
-    if(draftDbPromise) return draftDbPromise;
-    draftDbPromise = new Promise(function(resolve, reject){
-      var req = indexedDB.open(DRAFT_DB_NAME, 1);
-      req.onupgradeneeded = function(){
-        var db = req.result;
-        if(!db.objectStoreNames.contains(DRAFT_STORE_NAME)){
-          db.createObjectStore(DRAFT_STORE_NAME, { keyPath: 'id' });
-        }
-      };
-      req.onsuccess = function(){ resolve(req.result); };
-      req.onerror = function(){ reject(req.error); };
-    });
-    return draftDbPromise;
+  // ---------------- CRM：多語系文字方向偵測（希伯來文/阿拉伯文自動轉 RTL） ----------------
+  function applyRtlAwareness(input){
+    if(RTL_REGEX.test(input.value)){ input.setAttribute('dir', 'rtl'); }
+    else{ input.removeAttribute('dir'); }
   }
-  async function draftSave(draft){
-    var db = await openDraftDb();
-    return new Promise(function(resolve, reject){
-      var tx = db.transaction(DRAFT_STORE_NAME, 'readwrite');
-      tx.objectStore(DRAFT_STORE_NAME).put(draft);
-      tx.oncomplete = function(){ resolve(); };
-      tx.onerror = function(){ reject(tx.error); };
-    });
-  }
-  async function draftGetAll(){
-    var db = await openDraftDb();
-    return new Promise(function(resolve, reject){
-      var tx = db.transaction(DRAFT_STORE_NAME, 'readonly');
-      var req = tx.objectStore(DRAFT_STORE_NAME).getAll();
-      req.onsuccess = function(){ resolve(req.result || []); };
-      req.onerror = function(){ reject(req.error); };
-    });
-  }
-  async function draftDelete(id){
-    var db = await openDraftDb();
-    return new Promise(function(resolve, reject){
-      var tx = db.transaction(DRAFT_STORE_NAME, 'readwrite');
-      tx.objectStore(DRAFT_STORE_NAME).delete(id);
-      tx.oncomplete = function(){ resolve(); };
-      tx.onerror = function(){ reject(tx.error); };
-    });
-  }
-
-  async function renderDraftsEntry(){
-    var card = document.getElementById('draftsEntryCard');
-    if(!canWrite()){ card.style.display = 'none'; return; }
-    var drafts = [];
-    try{ drafts = await draftGetAll(); }catch(e){ drafts = []; }
-    document.getElementById('draftsToggleBtn').textContent = '暫存的草稿（' + drafts.length + '）';
-    card.style.display = drafts.length ? '' : 'none';
-    renderDraftsList(drafts);
-  }
-  function renderDraftsList(drafts){
-    var wrap = document.getElementById('draftsListWrap');
-    if(!drafts || drafts.length === 0){ wrap.innerHTML = ''; return; }
-    var sorted = drafts.slice().sort(function(a,b){ return (b.updatedAt||0)-(a.updatedAt||0); });
-    var html = sorted.map(function(d){
-      var name = (d.data && d.data.name) ? d.data.name : '（未命名）';
-      var time = new Date(d.updatedAt || d.createdAt || Date.now()).toLocaleString('zh-TW');
-      return '<div class="attach-preview-item">' + escapeHtml(name) + '　<span style="color:var(--ink-faint);">' + escapeHtml(time) + '</span>' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-resume-draft="' + d.id + '">繼續填寫</button>' +
-        '<button type="button" class="icon-btn danger btn-sm" data-delete-draft="' + d.id + '">刪除</button></div>';
-    }).join('');
-    wrap.innerHTML = html;
-    wrap.querySelectorAll('[data-resume-draft]').forEach(function(b){
-      b.addEventListener('click', function(){ resumeDraft(b.dataset.resumeDraft); });
-    });
-    wrap.querySelectorAll('[data-delete-draft]').forEach(function(b){
-      b.addEventListener('click', async function(){
-        await draftDelete(b.dataset.deleteDraft);
-        renderDraftsEntry();
-        toast('已刪除草稿');
-      });
-    });
-  }
-  document.getElementById('draftsToggleBtn').addEventListener('click', function(){
-    var wrap = document.getElementById('draftsListWrap');
-    wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
-  });
-  async function resumeDraft(id){
-    var drafts = await draftGetAll();
-    var draft = drafts.filter(function(d){ return d.id === id; })[0];
-    if(!draft) return;
-    resetLeadForm(true);
-    currentDraftId = draft.id;
-    currentDraftCreatedAt = draft.createdAt;
-    applyLeadFormData(draft.data || {});
-    photoState.card = { pendingFile: draft.cardFile || null, existingPath: null, removed: false };
-    photoState.avatar = { pendingFile: draft.avatarFile || null, existingPath: null, removed: false };
-    renderPhotoPreview('card');
-    renderPhotoPreview('avatar');
-    document.getElementById('draftsListWrap').style.display = 'none';
-    document.getElementById('leadFormCard').open = true;
-    document.getElementById('leadFormCard').scrollIntoView({behavior:'smooth', block:'start'});
-  }
-
-  var saveDraftDebounced = debounce(function(){
-    if(editingLeadId) return; // 編輯既有名單不走草稿
-    var data = collectLeadFormData();
-    if(!hasAnyLeadContent(data) && !photoState.card.pendingFile && !photoState.avatar.pendingFile) return;
-    if(!currentDraftId){ currentDraftId = crypto.randomUUID(); currentDraftCreatedAt = Date.now(); }
-    draftSave({
-      id: currentDraftId, createdAt: currentDraftCreatedAt, updatedAt: Date.now(),
-      data: data, cardFile: photoState.card.pendingFile, avatarFile: photoState.avatar.pendingFile
-    }).then(function(){ renderDraftsEntry(); });
-  }, 1200);
-  document.getElementById('leadForm').addEventListener('input', function(){ saveDraftDebounced(); });
-
-  document.getElementById('saveDraftBtn').addEventListener('click', async function(){
-    if(editingLeadId){ toast('編輯既有名單不能暫存草稿'); return; }
-    var data = collectLeadFormData();
-    if(!currentDraftId){ currentDraftId = crypto.randomUUID(); currentDraftCreatedAt = Date.now(); }
-    await draftSave({
-      id: currentDraftId, createdAt: currentDraftCreatedAt, updatedAt: Date.now(),
-      data: data, cardFile: photoState.card.pendingFile, avatarFile: photoState.avatar.pendingFile
-    });
-    renderDraftsEntry();
-    toast('已暫存草稿');
+  document.querySelectorAll('.rtl-aware').forEach(function(input){
+    applyRtlAwareness(input);
+    input.addEventListener('input', function(){ applyRtlAwareness(input); });
   });
 
-  // ---------------- CRM：照片轉檔（名片、頭像共用） ----------------
+  // ---------------- CRM：照片轉檔（頭像用） ----------------
   // 長邊縮到最多 1600px，轉成 WebP（品質 0.85）；轉檔失敗（少數舊 Safari）就 fallback 原始格式。
   function convertImageToWebp(file){
     return new Promise(function(resolve){
@@ -1890,207 +1853,394 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     return String(name || 'photo').replace(/\.[^.]+$/, '') + '.webp';
   }
 
-  // ---------------- CRM：名片/頭像上傳欄位（拍照＋選擇檔案共用邏輯） ----------------
-  function setupPhotoField(kind){
-    document.getElementById(kind + 'CameraBtn').addEventListener('click', function(){
-      document.getElementById('l_' + kind + '_camera').click();
+  // ---------------- CRM：客戶頭像上傳（拍照＋選擇檔案共用邏輯） ----------------
+  document.getElementById('avatarCameraBtn').addEventListener('click', function(){
+    document.getElementById('c_avatar_camera').click();
+  });
+  document.getElementById('avatarFilesBtn').addEventListener('click', function(){
+    document.getElementById('c_avatar_files').click();
+  });
+  function handleAvatarChange(ev){
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if(!file) return;
+    convertImageToWebp(file).then(function(converted){
+      photoState.avatar.pendingFile = converted;
+      photoState.avatar.removed = false;
+      renderAvatarPreview();
     });
-    document.getElementById(kind + 'FilesBtn').addEventListener('click', function(){
-      document.getElementById('l_' + kind + '_files').click();
-    });
-    function handleChange(ev){
-      var file = ev.target.files && ev.target.files[0];
-      ev.target.value = '';
-      if(!file) return;
-      convertImageToWebp(file).then(function(converted){
-        photoState[kind].pendingFile = converted;
-        photoState[kind].removed = false;
-        renderPhotoPreview(kind);
-      });
-    }
-    document.getElementById('l_' + kind + '_camera').addEventListener('change', handleChange);
-    document.getElementById('l_' + kind + '_files').addEventListener('change', handleChange);
   }
-  setupPhotoField('card');
-  setupPhotoField('avatar');
+  document.getElementById('c_avatar_camera').addEventListener('change', handleAvatarChange);
+  document.getElementById('c_avatar_files').addEventListener('change', handleAvatarChange);
 
-  function renderPhotoPreview(kind){
-    var wrap = document.getElementById(kind + 'PhotoPreview');
-    var st = photoState[kind];
+  function renderAvatarPreview(){
+    var wrap = document.getElementById('avatarPhotoPreview');
+    var st = photoState.avatar;
     if(st.pendingFile){
       var url = URL.createObjectURL(st.pendingFile);
       wrap.innerHTML = '<div class="attach-preview-item"><img src="' + url + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">已選擇新照片' +
-        '<button type="button" class="icon-btn danger btn-sm" data-remove-photo="' + kind + '">移除</button></div>';
+        '<button type="button" class="icon-btn danger btn-sm" id="removeAvatarBtn">移除</button></div>';
     } else if(st.existingPath && !st.removed){
-      var imgId = kind + 'PhotoImg';
-      wrap.innerHTML = '<div class="attach-preview-item"><img id="' + imgId + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">已上傳的照片' +
-        '<button type="button" class="icon-btn danger btn-sm" data-remove-photo="' + kind + '">移除</button></div>';
+      wrap.innerHTML = '<div class="attach-preview-item"><img id="avatarPhotoImg" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">已上傳的照片' +
+        '<button type="button" class="icon-btn danger btn-sm" id="removeAvatarBtn">移除</button></div>';
       supabase.storage.from('photos').createSignedUrl(st.existingPath, 60).then(function(res){
-        if(res.data){ var img = document.getElementById(imgId); if(img) img.src = res.data.signedUrl; }
+        if(res.data){ var img = document.getElementById('avatarPhotoImg'); if(img) img.src = res.data.signedUrl; }
       });
     } else {
       wrap.innerHTML = '<span style="font-size:12px;color:var(--ink-faint);">尚未上傳</span>';
     }
-    wrap.querySelectorAll('[data-remove-photo]').forEach(function(b){
-      b.addEventListener('click', function(){
-        var k = b.dataset.removePhoto;
-        photoState[k].pendingFile = null;
-        photoState[k].removed = true;
-        renderPhotoPreview(k);
+    var removeBtn = document.getElementById('removeAvatarBtn');
+    if(removeBtn){
+      removeBtn.addEventListener('click', function(){
+        photoState.avatar.pendingFile = null;
+        photoState.avatar.removed = true;
+        renderAvatarPreview();
+      });
+    }
+  }
+
+  async function uploadContactAvatar(contactId){
+    var st = photoState.avatar;
+    if(st.pendingFile){
+      var path = 'contacts/' + contactId + '/avatar.webp';
+      var res = await supabase.storage.from('photos').upload(path, st.pendingFile, { upsert: true });
+      if(res.error) throw new Error('客戶頭像上傳失敗：' + res.error.message);
+      return path;
+    } else if(st.removed){
+      return null;
+    } else {
+      return st.existingPath || null;
+    }
+  }
+
+  // ---------------- CRM：聯絡方式（一個聯絡人可以有多筆） ----------------
+  function contactMethodRowNode(values){
+    values = values || {};
+    var div = document.createElement('div');
+    div.className = 'item-row';
+    div.dataset.methodId = values.id || crypto.randomUUID();
+    var typeOptions = CONTACT_METHOD_TYPES.map(function(t){
+      return '<option value="' + t + '"' + (values.type === t ? ' selected' : '') + '>' + escapeHtml(CONTACT_METHOD_LABELS[t]) + '</option>';
+    }).join('');
+    div.innerHTML =
+      '<div class="item-row-grid" style="grid-template-columns:1fr 2fr auto auto;">' +
+        '<div class="field"><label>類型</label><select class="cm-type">' + typeOptions + '</select></div>' +
+        '<div class="field"><label>內容</label><input type="text" class="cm-value" value="' + escapeHtml(values.value_original || '') + '"></div>' +
+        '<div class="field"><label>主要</label><input type="checkbox" class="cm-primary"' + (values.is_primary ? ' checked' : '') + '></div>' +
+        '<div class="field" style="justify-content:flex-end;"><button type="button" class="icon-btn danger cm-remove-btn">移除</button></div>' +
+      '</div>';
+    return div;
+  }
+  function addContactMethodRow(values){
+    var wrap = document.getElementById('contactMethodRowsWrap');
+    var row = contactMethodRowNode(values);
+    wrap.appendChild(row);
+    row.querySelector('.cm-remove-btn').addEventListener('click', function(){ row.remove(); });
+  }
+  function clearContactMethodRows(){
+    document.getElementById('contactMethodRowsWrap').innerHTML = '';
+  }
+  function getContactMethodRowsData(){
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#contactMethodRowsWrap .item-row'));
+    var result = [];
+    rows.forEach(function(row){
+      var value = row.querySelector('.cm-value').value.trim();
+      if(!value) return;
+      result.push({
+        id: row.dataset.methodId,
+        type: row.querySelector('.cm-type').value,
+        value_original: value,
+        is_primary: row.querySelector('.cm-primary').checked
       });
     });
-  }
-
-  async function uploadLeadPhotos(leadId){
-    var result = {};
-    var kinds = ['card', 'avatar'];
-    for(var i = 0; i < kinds.length; i++){
-      var kind = kinds[i];
-      var st = photoState[kind];
-      var field = kind === 'card' ? 'card_photo_url' : 'avatar_photo_url';
-      if(st.pendingFile){
-        var path = 'leads/' + leadId + '/' + kind + '.webp';
-        var res = await supabase.storage.from('photos').upload(path, st.pendingFile, { upsert: true });
-        if(res.error) throw new Error((kind === 'card' ? '名片照片' : '客戶頭像') + '上傳失敗：' + res.error.message);
-        result[field] = path;
-      } else if(st.removed){
-        result[field] = null;
-      } else {
-        result[field] = st.existingPath || null;
-      }
-    }
     return result;
   }
+  document.getElementById('addContactMethodRowBtn').addEventListener('click', function(){ addContactMethodRow(); });
 
-  // ---------------- CRM：名單表單 ----------------
-  function refreshLeadFormSelects(){
-    fillSelect(document.getElementById('l_source_exhibition'), state.exhibitions, '未指定來源展覽（選填）', 'id', 'name');
-    fillSelect(document.getElementById('l_identity_category'), state.identityWeights, '未分類（選填）', 'category', 'category');
-    fillSelect(document.getElementById('l_department_relevance'), ['1','2','3','4','5'], '未評分（選填）');
-    fillSelect(document.getElementById('l_enthusiasm'), ['1','2','3','4','5'], '未評分（選填）');
-    fillSelect(document.getElementById('l_close_probability'), ['1','2','3','4','5'], '未評分（選填）');
-    fillSelect(document.getElementById('l_status'), LEAD_STATUSES);
-    fillSelect(document.getElementById('l_owner'), state.profiles, '請選擇負責業務', 'id', 'name');
-    if(!editingLeadId && !document.getElementById('l_owner').value && currentUser){
-      document.getElementById('l_owner').value = currentUser.id;
+  // ---------------- CRM：產品管理（僅管理員） ----------------
+  function renderProductsTable(){
+    var wrap = document.getElementById('productsTableWrap');
+    if(!currentUser || currentUser.role !== 'admin'){ wrap.innerHTML = ''; return; }
+    if(state.products.length === 0){ wrap.innerHTML = '<div class="empty-state">尚無產品資料。</div>'; return; }
+    var sorted = state.products.slice().sort(function(a,b){ return (a.sort_order||0) - (b.sort_order||0); });
+    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>產品名稱</th><th class="num">排序</th><th>啟用</th><th></th></tr></thead><tbody>';
+    sorted.forEach(function(p){
+      html += '<tr><td>' + escapeHtml(p.name) + '</td><td class="num">' + (p.sort_order||0) + '</td>' +
+        '<td><input type="checkbox" class="product-active-toggle" data-product-id="' + p.id + '"' + (p.active ? ' checked' : '') + '></td>' +
+        '<td><button type="button" class="icon-btn danger btn-sm" data-product-del="' + p.id + '">刪除</button></td></tr>';
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.product-active-toggle').forEach(function(cb){
+      cb.addEventListener('change', function(){ toggleProductActive(cb.dataset.productId, cb.checked); });
+    });
+    wrap.querySelectorAll('[data-product-del]').forEach(function(b){
+      b.addEventListener('click', function(){ deleteProduct(b.dataset.productDel); });
+    });
+  }
+  async function toggleProductActive(id, active){
+    showLoading(true);
+    try{
+      var res = await supabase.from('products').update({ active: active }).eq('id', id);
+      if(res.error) throw res.error;
+      await loadState();
+    }catch(err){
+      toast('更新失敗：' + err.message);
+    }finally{
+      showLoading(false);
+    }
+  }
+  async function deleteProduct(id){
+    if(!confirm('確定要刪除這個產品嗎？')) return;
+    showLoading(true);
+    try{
+      var res = await supabase.from('products').delete().eq('id', id);
+      if(res.error) throw res.error;
+      await loadState();
+      toast('已刪除');
+    }catch(err){
+      toast('刪除失敗：' + err.message);
+    }finally{
+      showLoading(false);
+    }
+  }
+  document.getElementById('addProductBtn').addEventListener('click', async function(){
+    var msg = document.getElementById('productFormMsg');
+    var name = document.getElementById('newProductName').value.trim();
+    if(!name){ msg.textContent = '請填寫產品名稱'; return; }
+    var sortOrder = parseInt(document.getElementById('newProductSort').value, 10) || 0;
+    showLoading(true);
+    try{
+      var res = await supabase.from('products').insert({ name: name, sort_order: sortOrder });
+      if(res.error) throw res.error;
+      document.getElementById('newProductName').value = '';
+      document.getElementById('newProductSort').value = 0;
+      msg.textContent = '';
+      toast('已新增產品');
+      await loadState();
+    }catch(err){
+      msg.textContent = '新增失敗：' + err.message;
+    }finally{
+      showLoading(false);
+    }
+  });
+
+  // ---------------- CRM：公司管理 ----------------
+  function renderCompaniesTable(){
+    var wrap = document.getElementById('companiesTableWrap');
+    if(state.companies.length === 0){ wrap.innerHTML = '<div class="empty-state">尚無公司資料。</div>'; return; }
+    var writable = canWrite();
+    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>公司名稱</th><th>網站</th><th>國家</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
+    state.companies.forEach(function(c){
+      var name = c.name_original || c.name_english || '（未命名）';
+      if(c.name_original && c.name_english) name += '／' + c.name_english;
+      html += '<tr><td>' + escapeHtml(name) + '</td>' +
+        '<td>' + (c.website ? '<a href="' + escapeHtml(c.website) + '" target="_blank" rel="noopener">' + escapeHtml(c.website) + '</a>' : '—') + '</td>' +
+        '<td>' + escapeHtml(c.country || '—') + '</td>' +
+        (writable ? ('<td><div class="row-actions">' +
+          '<button class="icon-btn" data-co-edit="' + c.id + '">編輯</button>' +
+          '<button class="icon-btn danger" data-co-del="' + c.id + '">刪除</button>' +
+        '</div></td>') : '') + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-co-edit]').forEach(function(b){ b.addEventListener('click', function(){ editCompany(b.dataset.coEdit); }); });
+    wrap.querySelectorAll('[data-co-del]').forEach(function(b){ b.addEventListener('click', function(){ deleteCompany(b.dataset.coDel); }); });
+  }
+  function resetCompanyForm(){
+    ['co_name_original','co_name_english','co_website','co_country','co_address_original','co_address_english'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    editingCompanyId = null;
+    document.getElementById('saveCompanyBtn').textContent = '新增公司';
+    document.getElementById('cancelCompanyBtn').style.display = 'none';
+    document.getElementById('companyFormMsg').textContent = '';
+  }
+  document.getElementById('cancelCompanyBtn').addEventListener('click', resetCompanyForm);
+  function editCompany(id){
+    var rec = state.companies.filter(function(x){ return x.id === id; })[0];
+    if(!rec) return;
+    editingCompanyId = id;
+    document.getElementById('companyFormCard').open = true;
+    document.getElementById('co_name_original').value = rec.name_original || '';
+    document.getElementById('co_name_english').value = rec.name_english || '';
+    document.getElementById('co_website').value = rec.website || '';
+    document.getElementById('co_country').value = rec.country || '';
+    document.getElementById('co_address_original').value = rec.address_original || '';
+    document.getElementById('co_address_english').value = rec.address_english || '';
+    applyRtlAwareness(document.getElementById('co_name_original'));
+    applyRtlAwareness(document.getElementById('co_address_original'));
+    document.getElementById('saveCompanyBtn').textContent = '更新公司';
+    document.getElementById('cancelCompanyBtn').style.display = 'inline-block';
+    document.getElementById('companyFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  document.getElementById('saveCompanyBtn').addEventListener('click', async function(){
+    var msg = document.getElementById('companyFormMsg');
+    var nameOriginal = document.getElementById('co_name_original').value.trim();
+    var nameEnglish = document.getElementById('co_name_english').value.trim();
+    if(!nameOriginal && !nameEnglish){ msg.textContent = '公司名稱（原文或英文）至少填一個'; return; }
+    var payload = {
+      name_original: nameOriginal || null,
+      name_english: nameEnglish || null,
+      website: document.getElementById('co_website').value.trim() || null,
+      country: document.getElementById('co_country').value.trim() || null,
+      address_original: document.getElementById('co_address_original').value.trim() || null,
+      address_english: document.getElementById('co_address_english').value.trim() || null
+    };
+    showLoading(true);
+    try{
+      var res;
+      if(editingCompanyId){
+        res = await supabase.from('companies').update(payload).eq('id', editingCompanyId);
+      } else {
+        res = await supabase.from('companies').insert(payload);
+      }
+      if(res.error) throw res.error;
+      toast(editingCompanyId ? '已更新公司' : '已新增公司');
+      resetCompanyForm();
+      await loadState();
+    }catch(err){
+      msg.textContent = '儲存失敗：' + err.message;
+    }finally{
+      showLoading(false);
+    }
+  });
+  async function deleteCompany(id){
+    if(!confirm('確定要刪除這間公司嗎？')) return;
+    showLoading(true);
+    try{
+      var res = await supabase.from('companies').delete().eq('id', id);
+      if(res.error) throw res.error;
+      await loadState();
+      toast('已刪除');
+    }catch(err){
+      toast('刪除失敗（可能還有聯絡人屬於這間公司）：' + err.message);
+    }finally{
+      showLoading(false);
     }
   }
 
-  function refreshLeadFilterSelects(){
-    var exSel = document.getElementById('leadFilterExhibition');
+  // ---------------- CRM：聯絡人表單 ----------------
+  function refreshContactFormSelects(){
+    fillSelect(document.getElementById('c_source_exhibition'), state.exhibitions, '未指定來源展覽（選填）', 'id', 'name');
+    var companyOptions = state.companies.map(function(co){
+      return { id: co.id, label: co.name_original || co.name_english || '（未命名公司）' };
+    });
+    fillSelect(document.getElementById('c_company'), companyOptions, '未指定公司（選填）', 'id', 'label');
+    fillSelect(document.getElementById('c_identity_category'), state.identityWeights, '未分類（選填）', 'category', 'category');
+    fillSelect(document.getElementById('c_department_relevance'), ['1','2','3','4','5'], '未評分（選填）');
+    fillSelect(document.getElementById('c_enthusiasm'), ['1','2','3','4','5'], '未評分（選填）');
+    fillSelect(document.getElementById('c_close_probability'), ['1','2','3','4','5'], '未評分（選填）');
+    fillSelect(document.getElementById('c_status'), CONTACT_STATUSES);
+    fillSelect(document.getElementById('c_owner'), state.profiles, '請選擇負責業務', 'id', 'name');
+    if(!editingContactId && !document.getElementById('c_owner').value && currentUser){
+      document.getElementById('c_owner').value = currentUser.id;
+    }
+  }
+
+  function refreshContactFilterSelects(){
+    var exSel = document.getElementById('contactFilterExhibition');
     var keepEx = exSel.value;
     exSel.innerHTML = '<option value="">全部展覽</option>';
     state.exhibitions.forEach(function(ex){ var o=document.createElement('option'); o.value=ex.id; o.textContent=ex.name; exSel.appendChild(o); });
     if(state.exhibitions.some(function(ex){return ex.id===keepEx;})) exSel.value = keepEx;
 
-    var ownerSel = document.getElementById('leadFilterOwner');
+    var ownerSel = document.getElementById('contactFilterOwner');
     var keepOwner = ownerSel.value;
     ownerSel.innerHTML = '<option value="">全部負責業務</option>';
     state.profiles.forEach(function(p){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; ownerSel.appendChild(o); });
     if(state.profiles.some(function(p){return p.id===keepOwner;})) ownerSel.value = keepOwner;
   }
-  document.getElementById('leadFilterExhibition').addEventListener('change', renderLeadsTable);
-  document.getElementById('leadFilterOwner').addEventListener('change', renderLeadsTable);
-  document.getElementById('leadFilterStatus').addEventListener('change', renderLeadsTable);
-  document.getElementById('leadsRefreshBtn').addEventListener('click', function(){ loadState(); });
+  document.getElementById('contactFilterExhibition').addEventListener('change', renderContactsTable);
+  document.getElementById('contactFilterOwner').addEventListener('change', renderContactsTable);
+  document.getElementById('contactFilterImportance').addEventListener('change', renderContactsTable);
+  document.getElementById('contactFilterStatus').addEventListener('change', renderContactsTable);
+  document.getElementById('contactSearchInput').addEventListener('input', debounce(function(){ renderContactsTable(); }, 250));
+  document.getElementById('contactsRefreshBtn').addEventListener('click', function(){ loadState(); });
 
-  function collectLeadFormData(){
-    return {
-      name: document.getElementById('l_name').value,
-      company: document.getElementById('l_company').value,
-      title: document.getElementById('l_title').value,
-      contact_info: document.getElementById('l_contact_info').value,
-      source_exhibition_id: document.getElementById('l_source_exhibition').value,
-      identity_category: document.getElementById('l_identity_category').value,
-      department_relevance: document.getElementById('l_department_relevance').value,
-      enthusiasm: document.getElementById('l_enthusiasm').value,
-      close_probability: document.getElementById('l_close_probability').value,
-      status: document.getElementById('l_status').value,
-      deal_amount: document.getElementById('l_deal_amount').value,
-      deal_date: document.getElementById('l_deal_date').value,
-      owner_id: document.getElementById('l_owner').value,
-      note: document.getElementById('l_note').value
-    };
-  }
-  function applyLeadFormData(data){
-    document.getElementById('l_name').value = data.name || '';
-    document.getElementById('l_company').value = data.company || '';
-    document.getElementById('l_title').value = data.title || '';
-    document.getElementById('l_contact_info').value = data.contact_info || '';
-    document.getElementById('l_source_exhibition').value = data.source_exhibition_id || '';
-    document.getElementById('l_identity_category').value = data.identity_category || '';
-    document.getElementById('l_department_relevance').value = data.department_relevance || '';
-    document.getElementById('l_enthusiasm').value = data.enthusiasm || '';
-    document.getElementById('l_close_probability').value = data.close_probability || '';
-    document.getElementById('l_status').value = data.status || '新名單';
-    document.getElementById('l_deal_amount').value = data.deal_amount || '';
-    document.getElementById('l_deal_date').value = data.deal_date || '';
-    document.getElementById('l_owner').value = data.owner_id || '';
-    document.getElementById('l_note').value = data.note || '';
-  }
-  function hasAnyLeadContent(data){
-    return !!(data.name || data.company || data.title || data.contact_info || data.note ||
-      data.identity_category || data.department_relevance || data.enthusiasm || data.close_probability);
-  }
-
-  function resetLeadForm(skipDraftReset){
-    document.getElementById('leadForm').reset();
-    editingLeadId = null;
-    photoState.card = { pendingFile: null, existingPath: null, removed: false };
+  function resetContactForm(){
+    document.getElementById('contactForm').reset();
+    editingContactId = null;
+    clearContactMethodRows();
+    addContactMethodRow();
     photoState.avatar = { pendingFile: null, existingPath: null, removed: false };
-    renderPhotoPreview('card');
-    renderPhotoPreview('avatar');
-    document.getElementById('l_status').value = '新名單';
-    if(currentUser) document.getElementById('l_owner').value = currentUser.id;
-    if(!skipDraftReset){ currentDraftId = null; currentDraftCreatedAt = null; }
-    document.getElementById('leadSubmitBtn').textContent = '新增名單';
-    document.getElementById('leadCancelBtn').style.display = 'none';
-    document.getElementById('leadFormMsg').textContent = '';
+    renderAvatarPreview();
+    document.getElementById('c_importance').value = '未分類';
+    document.getElementById('c_status').value = '新名單';
+    if(currentUser) document.getElementById('c_owner').value = currentUser.id;
+    document.getElementById('contactSubmitBtn').textContent = '新增聯絡人';
+    document.getElementById('contactCancelBtn').style.display = 'none';
+    document.getElementById('contactFormMsg').textContent = '';
   }
-  document.getElementById('leadCancelBtn').addEventListener('click', function(){ resetLeadForm(); });
+  document.getElementById('contactCancelBtn').addEventListener('click', resetContactForm);
 
-  document.getElementById('leadForm').addEventListener('submit', async function(ev){
+  document.getElementById('contactForm').addEventListener('submit', async function(ev){
     ev.preventDefault();
-    var msg = document.getElementById('leadFormMsg');
-    var name = document.getElementById('l_name').value.trim();
-    if(!name){ msg.textContent = '請填寫姓名'; return; }
+    var msg = document.getElementById('contactFormMsg');
+    var nameOriginal = document.getElementById('c_name_original').value.trim();
+    if(!nameOriginal){ msg.textContent = '請填寫姓名（原文）'; return; }
+    var methods = getContactMethodRowsData();
 
     var payload = {
-      name: name,
-      company: document.getElementById('l_company').value.trim() || null,
-      title: document.getElementById('l_title').value.trim() || null,
-      contact_info: document.getElementById('l_contact_info').value.trim() || null,
-      source_exhibition_id: document.getElementById('l_source_exhibition').value || null,
-      identity_category: document.getElementById('l_identity_category').value || null,
-      department_relevance: document.getElementById('l_department_relevance').value ? parseInt(document.getElementById('l_department_relevance').value, 10) : null,
-      enthusiasm: document.getElementById('l_enthusiasm').value ? parseInt(document.getElementById('l_enthusiasm').value, 10) : null,
-      close_probability: document.getElementById('l_close_probability').value ? parseInt(document.getElementById('l_close_probability').value, 10) : null,
-      status: document.getElementById('l_status').value,
-      deal_amount: document.getElementById('l_deal_amount').value ? parseFloat(document.getElementById('l_deal_amount').value) : null,
-      deal_date: document.getElementById('l_deal_date').value || null,
-      owner_id: document.getElementById('l_owner').value || null,
-      note: document.getElementById('l_note').value.trim() || null
+      company_id: document.getElementById('c_company').value || null,
+      name_original: nameOriginal,
+      name_english: document.getElementById('c_name_english').value.trim() || null,
+      department_original: document.getElementById('c_department_original').value.trim() || null,
+      department_english: document.getElementById('c_department_english').value.trim() || null,
+      title_original: document.getElementById('c_title_original').value.trim() || null,
+      title_english: document.getElementById('c_title_english').value.trim() || null,
+      country: document.getElementById('c_country').value.trim() || null,
+      address_original: document.getElementById('c_address_original').value.trim() || null,
+      address_english: document.getElementById('c_address_english').value.trim() || null,
+      importance: document.getElementById('c_importance').value || '未分類',
+      customer_type: document.getElementById('c_customer_type').value.trim() || null,
+      identity_category: document.getElementById('c_identity_category').value || null,
+      department_relevance: document.getElementById('c_department_relevance').value ? parseInt(document.getElementById('c_department_relevance').value, 10) : null,
+      enthusiasm: document.getElementById('c_enthusiasm').value ? parseInt(document.getElementById('c_enthusiasm').value, 10) : null,
+      close_probability: document.getElementById('c_close_probability').value ? parseInt(document.getElementById('c_close_probability').value, 10) : null,
+      status: document.getElementById('c_status').value,
+      deal_amount: document.getElementById('c_deal_amount').value ? parseFloat(document.getElementById('c_deal_amount').value) : null,
+      deal_date: document.getElementById('c_deal_date').value || null,
+      owner_id: document.getElementById('c_owner').value || null,
+      note: document.getElementById('c_note').value.trim() || null
     };
 
     showLoading(true);
     try{
-      var leadId = editingLeadId || crypto.randomUUID();
-      var photoFields = await uploadLeadPhotos(leadId);
-      payload.card_photo_url = photoFields.card_photo_url;
-      payload.avatar_photo_url = photoFields.avatar_photo_url;
+      var contactId = editingContactId || crypto.randomUUID();
+      payload.avatar_photo_url = await uploadContactAvatar(contactId);
 
       var res;
-      if(editingLeadId){
-        res = await supabase.from('leads').update(payload).eq('id', editingLeadId);
+      if(editingContactId){
+        res = await supabase.from('contacts').update(payload).eq('id', editingContactId);
       } else {
-        payload.id = leadId;
-        res = await supabase.from('leads').insert(payload);
+        payload.id = contactId;
+        res = await supabase.from('contacts').insert(payload);
       }
       if(res.error) throw res.error;
 
-      if(!editingLeadId && currentDraftId){ await draftDelete(currentDraftId); }
-      toast(editingLeadId ? '已更新名單' : '已新增名單');
-      resetLeadForm();
+      // 聯絡方式筆數不多，直接刪除重建比對比 diff 簡單，且聯絡方式沒有掛附件不會有孤兒檔案問題
+      var delRes = await supabase.from('contact_methods').delete().eq('contact_id', contactId);
+      if(delRes.error) throw delRes.error;
+      if(methods.length){
+        var methodsPayload = methods.map(function(m){
+          return { contact_id: contactId, type: m.type, value_original: m.value_original, is_primary: m.is_primary };
+        });
+        var cmRes = await supabase.from('contact_methods').insert(methodsPayload);
+        if(cmRes.error) throw cmRes.error;
+      }
+
+      var sourceExhibitionId = document.getElementById('c_source_exhibition').value;
+      if(sourceExhibitionId){
+        var ecRes = await supabase.from('event_contacts').upsert(
+          { exhibition_id: sourceExhibitionId, contact_id: contactId, scanned_by: currentUser.id },
+          { onConflict: 'exhibition_id,contact_id' }
+        );
+        if(ecRes.error) throw ecRes.error;
+      }
+
+      toast(editingContactId ? '已更新聯絡人' : '已新增聯絡人');
+      resetContactForm();
       await loadState();
     }catch(err){
       msg.textContent = '儲存失敗：' + err.message;
@@ -2099,39 +2249,57 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     }
   });
 
-  function editLead(id){
-    var rec = state.leads.filter(function(x){ return x.id === id; })[0];
+  function editContact(id){
+    var rec = state.contacts.filter(function(x){ return x.id === id; })[0];
     if(!rec) return;
-    editingLeadId = id;
-    currentDraftId = null;
-    currentDraftCreatedAt = null;
-    document.getElementById('leadFormCard').open = true;
-    applyLeadFormData({
-      name: rec.name, company: rec.company, title: rec.title, contact_info: rec.contact_info,
-      source_exhibition_id: rec.source_exhibition_id, identity_category: rec.identity_category,
-      department_relevance: rec.department_relevance, enthusiasm: rec.enthusiasm, close_probability: rec.close_probability,
-      status: rec.status, deal_amount: rec.deal_amount, deal_date: rec.deal_date, owner_id: rec.owner_id, note: rec.note
-    });
-    photoState.card = { pendingFile: null, existingPath: rec.card_photo_url || null, removed: false };
+    editingContactId = id;
+    document.getElementById('contactFormCard').open = true;
+    document.getElementById('c_source_exhibition').value = '';
+    document.getElementById('c_company').value = rec.company_id || '';
+    document.getElementById('c_importance').value = rec.importance || '未分類';
+    document.getElementById('c_name_original').value = rec.name_original || '';
+    document.getElementById('c_name_english').value = rec.name_english || '';
+    document.getElementById('c_customer_type').value = rec.customer_type || '';
+    document.getElementById('c_department_original').value = rec.department_original || '';
+    document.getElementById('c_department_english').value = rec.department_english || '';
+    document.getElementById('c_title_original').value = rec.title_original || '';
+    document.getElementById('c_title_english').value = rec.title_english || '';
+    document.getElementById('c_country').value = rec.country || '';
+    document.getElementById('c_address_original').value = rec.address_original || '';
+    document.getElementById('c_address_english').value = rec.address_english || '';
+    document.getElementById('c_identity_category').value = rec.identity_category || '';
+    document.getElementById('c_department_relevance').value = rec.department_relevance || '';
+    document.getElementById('c_enthusiasm').value = rec.enthusiasm || '';
+    document.getElementById('c_close_probability').value = rec.close_probability || '';
+    document.getElementById('c_status').value = rec.status || '新名單';
+    document.getElementById('c_deal_amount').value = rec.deal_amount != null ? rec.deal_amount : '';
+    document.getElementById('c_deal_date').value = rec.deal_date || '';
+    document.getElementById('c_owner').value = rec.owner_id || '';
+    document.getElementById('c_note').value = rec.note || '';
+
+    clearContactMethodRows();
+    var methods = rec.contact_methods || [];
+    if(methods.length === 0){ addContactMethodRow(); }
+    else{ methods.forEach(function(m){ addContactMethodRow(m); }); }
+
     photoState.avatar = { pendingFile: null, existingPath: rec.avatar_photo_url || null, removed: false };
-    renderPhotoPreview('card');
-    renderPhotoPreview('avatar');
-    document.getElementById('leadSubmitBtn').textContent = '更新名單';
-    document.getElementById('leadCancelBtn').style.display = 'inline-block';
-    document.getElementById('leadFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+    renderAvatarPreview();
+
+    document.querySelectorAll('#contactForm .rtl-aware').forEach(applyRtlAwareness);
+
+    document.getElementById('contactSubmitBtn').textContent = '更新聯絡人';
+    document.getElementById('contactCancelBtn').style.display = 'inline-block';
+    document.getElementById('contactFormCard').scrollIntoView({behavior:'smooth', block:'start'});
   }
 
-  async function deleteLead(id){
-    if(!confirm('確定要刪除這筆名單嗎？（底下的聯繫紀錄會一併刪除）')) return;
-    var rec = state.leads.filter(function(x){ return x.id === id; })[0];
+  async function deleteContact(id){
+    if(!confirm('確定要刪除這個聯絡人嗎？（聯絡方式、聯繫紀錄、待辦事項會一併刪除）')) return;
+    var rec = state.contacts.filter(function(x){ return x.id === id; })[0];
     showLoading(true);
     try{
-      var res = await supabase.from('leads').delete().eq('id', id);
+      var res = await supabase.from('contacts').delete().eq('id', id);
       if(res.error) throw res.error;
-      var toRemove = [];
-      if(rec && rec.card_photo_url) toRemove.push(rec.card_photo_url);
-      if(rec && rec.avatar_photo_url) toRemove.push(rec.avatar_photo_url);
-      if(toRemove.length) supabase.storage.from('photos').remove(toRemove).catch(function(){});
+      if(rec && rec.avatar_photo_url) supabase.storage.from('photos').remove([rec.avatar_photo_url]).catch(function(){});
       await loadState();
       toast('已刪除');
     }catch(err){
@@ -2141,22 +2309,25 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     }
   }
 
-  async function addContactLog(leadId, btn){
+  // ---------------- CRM：聯繫紀錄／待辦事項 ----------------
+  async function addInteraction(contactId, btn){
     var container = btn.parentElement;
-    var date = container.querySelector('.log-date').value;
-    var method = container.querySelector('.log-method').value;
-    var summary = container.querySelector('.log-summary').value.trim();
-    var nextFollowUp = container.querySelector('.log-next-follow-up').value;
+    var date = container.querySelector('.ia-date').value;
+    var type = container.querySelector('.ia-type').value;
+    var content = container.querySelector('.ia-content').value.trim();
+    var needs = container.querySelector('.ia-needs').value.trim();
+    var nextDate = container.querySelector('.ia-next-date').value;
     var msgEl = container.querySelector('.form-msg');
     if(!date){ msgEl.textContent = '請選擇日期'; return; }
     showLoading(true);
     try{
-      var res = await supabase.from('contact_logs').insert({
-        lead_id: leadId, date: date, contact_method: method, summary: summary || null,
-        next_follow_up_date: nextFollowUp || null
+      var res = await supabase.from('interactions').insert({
+        contact_id: contactId, interaction_date: date, interaction_type: type,
+        content: content || null, customer_needs: needs || null,
+        next_follow_up_date: nextDate || null, created_by: currentUser.id
       });
       if(res.error) throw res.error;
-      expandedLeadIds[leadId] = true;
+      expandedContactIds[contactId] = true;
       toast('已新增聯繫紀錄');
       await loadState();
     }catch(err){
@@ -2166,92 +2337,184 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     }
   }
 
-  function renderLeadsTable(){
-    var wrap = document.getElementById('leadsTableWrap');
-    var filterExhibition = document.getElementById('leadFilterExhibition').value;
-    var filterOwner = document.getElementById('leadFilterOwner').value;
-    var filterStatus = document.getElementById('leadFilterStatus').value;
-    var rows = state.leads.filter(function(l){
-      return (!filterExhibition || l.source_exhibition_id === filterExhibition) &&
-        (!filterOwner || l.owner_id === filterOwner) &&
-        (!filterStatus || l.status === filterStatus);
+  async function addTask(contactId, btn){
+    var container = btn.parentElement;
+    var title = container.querySelector('.task-title').value.trim();
+    var dueDate = container.querySelector('.task-due-date').value;
+    var msgEl = container.querySelector('.form-msg');
+    if(!title){ msgEl.textContent = '請填寫待辦標題'; return; }
+    showLoading(true);
+    try{
+      var res = await supabase.from('tasks').insert({
+        contact_id: contactId, title: title, due_date: dueDate || null,
+        assigned_to: currentUser.id, created_by: currentUser.id
+      });
+      if(res.error) throw res.error;
+      expandedContactIds[contactId] = true;
+      toast('已新增待辦事項');
+      await loadState();
+    }catch(err){
+      msgEl.textContent = '新增失敗：' + err.message;
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  async function toggleTaskDone(taskId, cb){
+    showLoading(true);
+    try{
+      var res = await supabase.from('tasks').update({ status: cb.checked ? '已完成' : '待處理' }).eq('id', taskId);
+      if(res.error) throw res.error;
+      var detailRow = cb.closest('[data-contact-detail]');
+      if(detailRow) expandedContactIds[detailRow.dataset.contactDetail] = true;
+      await loadState();
+    }catch(err){
+      toast('更新失敗：' + err.message);
+      cb.checked = !cb.checked;
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  // ---------------- CRM：聯絡人列表 ----------------
+  function renderContactsTable(){
+    var wrap = document.getElementById('contactsTableWrap');
+    var search = document.getElementById('contactSearchInput').value.trim().toLowerCase();
+    var filterExhibition = document.getElementById('contactFilterExhibition').value;
+    var filterOwner = document.getElementById('contactFilterOwner').value;
+    var filterImportance = document.getElementById('contactFilterImportance').value;
+    var filterStatus = document.getElementById('contactFilterStatus').value;
+
+    var rows = state.contacts.filter(function(c){
+      if(filterExhibition){
+        var inExhibition = (c.event_contacts||[]).some(function(ec){ return ec.exhibition_id === filterExhibition; });
+        if(!inExhibition) return false;
+      }
+      if(filterOwner && c.owner_id !== filterOwner) return false;
+      if(filterImportance && c.importance !== filterImportance) return false;
+      if(filterStatus && c.status !== filterStatus) return false;
+      if(search){
+        var companyName = c.company ? ((c.company.name_original||'') + ' ' + (c.company.name_english||'')) : '';
+        var methodsText = (c.contact_methods||[]).map(function(m){ return m.value_original||''; }).join(' ');
+        var haystack = [c.name_original, c.name_english, companyName, methodsText].join(' ').toLowerCase();
+        if(haystack.indexOf(search) < 0) return false;
+      }
+      return true;
     });
-    rows = rows.slice().sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
 
     if(rows.length === 0){
-      wrap.innerHTML = '<div class="empty-state"><div class="big">🗂️</div>尚無名單資料，請於上方表單新增第一筆。</div>';
+      wrap.innerHTML = '<div class="empty-state"><div class="big">🗂️</div>尚無符合條件的聯絡人。</div>';
       return;
     }
     var writable = canWrite();
-    var colspan = writable ? 10 : 9;
+    var colspan = writable ? 9 : 8;
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th></th><th>姓名</th><th>公司／職稱</th><th>來源展覽</th><th>身份類別</th>' +
-      '<th class="num">名單價值分數</th><th>狀態</th><th class="num">成交金額</th><th>負責業務</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
-    rows.forEach(function(l){
-      var exName = l.exhibition ? l.exhibition.name : '—';
-      var ownerName = l.owner ? l.owner.name : '—';
-      var expanded = !!expandedLeadIds[l.id];
+      '<th></th><th>姓名</th><th>公司</th><th>職稱</th><th>重要程度</th>' +
+      '<th class="num">聯絡人價值分數</th><th>狀態</th><th>負責業務</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
+    rows.forEach(function(c){
+      var companyName = c.company ? (c.company.name_original || c.company.name_english || '—') : '—';
+      var title = c.title_original || c.title_english || '—';
+      var ownerName = c.owner ? c.owner.name : '—';
+      var expanded = !!expandedContactIds[c.id];
       html += '<tr>' +
-        '<td><button type="button" class="icon-btn" data-toggle-lead="' + l.id + '">' + (expanded ? '▾' : '▸') + '</button></td>' +
-        '<td>' + escapeHtml(l.name) + '</td>' +
-        '<td>' + escapeHtml(l.company||'—') + (l.title ? '／' + escapeHtml(l.title) : '') + '</td>' +
-        '<td>' + escapeHtml(exName) + '</td>' +
-        '<td>' + escapeHtml(l.identity_category||'—') + '</td>' +
-        '<td class="num">' + (l.lead_score != null ? fmtNum(l.lead_score, 1) : '—') + '</td>' +
-        '<td><span class="tag">' + escapeHtml(l.status) + '</span></td>' +
-        '<td class="num">' + (l.status === '已成交' && l.deal_amount != null ? fmtInt(l.deal_amount) : '—') + '</td>' +
+        '<td><button type="button" class="icon-btn" data-toggle-contact="' + c.id + '">' + (expanded ? '▾' : '▸') + '</button></td>' +
+        '<td>' + escapeHtml(c.name_original || c.name_english || '—') + '</td>' +
+        '<td>' + escapeHtml(companyName) + '</td>' +
+        '<td>' + escapeHtml(title) + '</td>' +
+        '<td><span class="tag">' + escapeHtml(c.importance) + '</span></td>' +
+        '<td class="num">' + (c.contact_score != null ? fmtNum(c.contact_score, 1) : '—') + '</td>' +
+        '<td><span class="tag">' + escapeHtml(c.status) + '</span></td>' +
         '<td>' + escapeHtml(ownerName) + '</td>' +
         (writable ? ('<td><div class="row-actions">' +
-          '<button class="icon-btn" data-lead-edit="' + l.id + '">編輯</button>' +
-          '<button class="icon-btn danger" data-lead-del="' + l.id + '">刪除</button>' +
+          '<button class="icon-btn" data-contact-edit="' + c.id + '">編輯</button>' +
+          '<button class="icon-btn danger" data-contact-del="' + c.id + '">刪除</button>' +
         '</div></td>') : '') + '</tr>';
-      html += '<tr class="item-detail-row" data-lead-detail="' + l.id + '" style="display:' + (expanded ? 'table-row' : 'none') + ';">' +
-        '<td colspan="' + colspan + '" style="background:var(--surface-alt);">' + renderLeadDetail(l) + '</td></tr>';
+      html += '<tr class="item-detail-row" data-contact-detail="' + c.id + '" style="display:' + (expanded ? 'table-row' : 'none') + ';">' +
+        '<td colspan="' + colspan + '" style="background:var(--surface-alt);">' + renderContactDetail(c) + '</td></tr>';
     });
     html += '</tbody></table></div>';
-    html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆名單</span></div>';
+    html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆聯絡人</span></div>';
     wrap.innerHTML = html;
-    wrap.querySelectorAll('[data-lead-edit]').forEach(function(b){ b.addEventListener('click', function(){ editLead(b.dataset.leadEdit); }); });
-    wrap.querySelectorAll('[data-lead-del]').forEach(function(b){ b.addEventListener('click', function(){ deleteLead(b.dataset.leadDel); }); });
-    wrap.querySelectorAll('[data-add-log]').forEach(function(b){ b.addEventListener('click', function(){ addContactLog(b.dataset.addLog, b); }); });
-    wrap.querySelectorAll('[data-toggle-lead]').forEach(function(b){
+    wrap.querySelectorAll('[data-contact-edit]').forEach(function(b){ b.addEventListener('click', function(){ editContact(b.dataset.contactEdit); }); });
+    wrap.querySelectorAll('[data-contact-del]').forEach(function(b){ b.addEventListener('click', function(){ deleteContact(b.dataset.contactDel); }); });
+    wrap.querySelectorAll('[data-add-interaction]').forEach(function(b){ b.addEventListener('click', function(){ addInteraction(b.dataset.addInteraction, b); }); });
+    wrap.querySelectorAll('[data-add-task]').forEach(function(b){ b.addEventListener('click', function(){ addTask(b.dataset.addTask, b); }); });
+    wrap.querySelectorAll('[data-task-done]').forEach(function(b){ b.addEventListener('click', function(){ toggleTaskDone(b.dataset.taskDone, b); }); });
+    wrap.querySelectorAll('[data-toggle-contact]').forEach(function(b){
       b.addEventListener('click', function(){
-        var id = b.dataset.toggleLead;
-        var row = wrap.querySelector('[data-lead-detail="' + id + '"]');
+        var id = b.dataset.toggleContact;
+        var row = wrap.querySelector('[data-contact-detail="' + id + '"]');
         var showing = row.style.display !== 'none';
         row.style.display = showing ? 'none' : 'table-row';
         b.textContent = showing ? '▸' : '▾';
-        expandedLeadIds[id] = !showing;
+        expandedContactIds[id] = !showing;
       });
     });
   }
 
-  function renderLeadDetail(l){
-    var logs = l.contact_logs || [];
-    var logsHtml = logs.length === 0
-      ? '<div style="padding:10px 16px;color:var(--ink-faint);font-size:12.5px;">尚無聯繫紀錄</div>'
-      : '<table style="margin:0;"><thead><tr><th style="padding-left:40px;">日期</th><th>方式</th><th>摘要</th><th>下次追蹤</th></tr></thead><tbody>' +
-        logs.map(function(log){
-          return '<tr><td style="padding-left:40px;" class="mono">' + escapeHtml(log.date) + '</td>' +
-            '<td>' + escapeHtml(log.contact_method||'—') + '</td>' +
-            '<td>' + escapeHtml(log.summary||'—') + '</td>' +
-            '<td class="mono">' + escapeHtml(log.next_follow_up_date||'—') + '</td></tr>';
+  function renderContactDetail(c){
+    var methodsHtml = (c.contact_methods && c.contact_methods.length)
+      ? c.contact_methods.map(function(m){
+          return '<span class="tag">' + escapeHtml(CONTACT_METHOD_LABELS[m.type]||m.type) + '：' + escapeHtml(m.value_original) + (m.is_primary ? ' ★' : '') + '</span>';
+        }).join(' ')
+      : '<span style="color:var(--ink-faint);">尚無聯絡方式</span>';
+
+    var exhibitionsHtml = (c.event_contacts && c.event_contacts.length)
+      ? c.event_contacts.map(function(ec){ return '<span class="tag">' + escapeHtml(ec.exhibition ? ec.exhibition.name : '—') + '</span>'; }).join(' ')
+      : '<span style="color:var(--ink-faint);">尚無參展紀錄</span>';
+
+    var interactions = c.interactions || [];
+    var interactionsHtml = interactions.length === 0
+      ? '<div style="padding:6px 0;color:var(--ink-faint);font-size:12.5px;">尚無聯繫紀錄</div>'
+      : '<table style="margin:0;"><thead><tr><th>日期</th><th>方式</th><th>內容</th><th>下次追蹤</th></tr></thead><tbody>' +
+        interactions.map(function(it){
+          return '<tr><td class="mono">' + escapeHtml(it.interaction_date) + '</td>' +
+            '<td>' + escapeHtml(it.interaction_type||'—') + '</td>' +
+            '<td>' + escapeHtml(it.content||'—') + '</td>' +
+            '<td class="mono">' + escapeHtml(it.next_follow_up_date||'—') + '</td></tr>';
         }).join('') + '</tbody></table>';
 
-    var addFormHtml = canWrite() ? (
-      '<div style="padding:12px 16px 16px 40px;">' +
+    var addInteractionHtml = canWrite() ? (
+      '<div style="margin-top:8px;">' +
         '<div class="form-grid" style="grid-template-columns:repeat(4,1fr);">' +
-          '<div class="field"><label>日期</label><input type="date" class="log-date" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
-          '<div class="field"><label>聯繫方式</label><select class="log-method"><option>電話</option><option>Email</option><option>拜訪</option><option>其他</option></select></div>' +
-          '<div class="field span-2"><label>內容摘要</label><input type="text" class="log-summary" placeholder="這次聯繫的重點"></div>' +
-          '<div class="field"><label>下次追蹤提醒日期</label><input type="date" class="log-next-follow-up"></div>' +
+          '<div class="field"><label>日期</label><input type="date" class="ia-date" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
+          '<div class="field"><label>聯繫方式</label><select class="ia-type"><option>電話</option><option>Email</option><option>拜訪</option><option>視訊</option><option>其他</option></select></div>' +
+          '<div class="field span-2"><label>內容摘要</label><input type="text" class="ia-content" placeholder="這次聯繫的重點"></div>' +
+          '<div class="field"><label>客戶需求</label><input type="text" class="ia-needs"></div>' +
+          '<div class="field"><label>下次追蹤提醒日期</label><input type="date" class="ia-next-date"></div>' +
         '</div>' +
-        '<button type="button" class="btn btn-primary btn-sm" data-add-log="' + l.id + '" style="margin-top:8px;">新增聯繫紀錄</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" data-add-interaction="' + c.id + '" style="margin-top:6px;">新增聯繫紀錄</button>' +
         '<span class="form-msg" style="display:inline-block;margin-left:8px;"></span>' +
       '</div>'
     ) : '';
 
-    return '<div>' + logsHtml + addFormHtml + '</div>';
+    var tasks = c.tasks || [];
+    var tasksHtml = tasks.length === 0
+      ? '<div style="padding:6px 0;color:var(--ink-faint);font-size:12.5px;">尚無待辦事項</div>'
+      : '<table style="margin:0;"><thead><tr><th></th><th>標題</th><th>到期日</th><th>狀態</th></tr></thead><tbody>' +
+        tasks.map(function(t){
+          return '<tr><td><input type="checkbox" class="task-done-cb" data-task-done="' + t.id + '"' + (t.status==='已完成'?' checked':'') + '></td>' +
+            '<td>' + escapeHtml(t.title) + '</td><td class="mono">' + escapeHtml(t.due_date||'—') + '</td>' +
+            '<td><span class="tag">' + escapeHtml(t.status) + '</span></td></tr>';
+        }).join('') + '</tbody></table>';
+
+    var addTaskHtml = canWrite() ? (
+      '<div style="margin-top:8px;">' +
+        '<div class="form-grid" style="grid-template-columns:2fr 1fr auto;">' +
+          '<div class="field"><label>待辦標題</label><input type="text" class="task-title" placeholder="要做的事"></div>' +
+          '<div class="field"><label>到期日</label><input type="date" class="task-due-date"></div>' +
+          '<div class="field" style="justify-content:flex-end;"><button type="button" class="btn btn-primary btn-sm" data-add-task="' + c.id + '">新增待辦</button></div>' +
+        '</div>' +
+        '<span class="form-msg" style="display:inline-block;"></span>' +
+      '</div>'
+    ) : '';
+
+    return '<div style="padding:12px 16px 16px 40px;">' +
+      '<div style="margin-bottom:10px;"><strong>聯絡方式：</strong> ' + methodsHtml + '</div>' +
+      '<div style="margin-bottom:10px;"><strong>參展紀錄：</strong> ' + exhibitionsHtml + '</div>' +
+      '<div class="sub-form-section" style="margin-top:12px;padding-top:12px;"><h4 class="sub-form-heading">聯繫紀錄</h4>' + interactionsHtml + addInteractionHtml + '</div>' +
+      '<div class="sub-form-section"><h4 class="sub-form-heading">待辦事項</h4>' + tasksHtml + addTaskHtml + '</div>' +
+    '</div>';
   }
 
   // ---------------- CRM：身份權重設定（僅管理員） ----------------
@@ -2469,6 +2732,9 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     addItemRow();
     updateRateButtonState();
     updateExpenseTypeState();
+    clearContactMethodRows();
+    addContactMethodRow();
+    renderAvatarPreview();
 
     if(!IS_CONFIGURED){
       showAuthScreen();
