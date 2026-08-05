@@ -13,7 +13,7 @@
 - ✅ 權限系統細節（viewer 隱藏按鈕、管理員的使用者管理畫面）
 - ✅ 附件上傳（收據/票根/發票，存進 Supabase Storage 的 `attachments` bucket）
 - ✅ 費用明細改成「單據（一張發票/收據）+ 品項（可多筆）」兩層結構，含付款對象主檔
-- ⏳ CRM 客戶名單模組 — 下一階段
+- ✅ CRM 客戶名單模組（名單/聯繫紀錄/身份權重、草稿暫存、名片與頭像拍照上傳）
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
 
@@ -32,6 +32,9 @@
 - `supabase/sql/04_expense_documents.sql` — **破壞性變更**：把費用明細改成
   「單據 `expense_documents` + 品項 `expense_items`」兩層結構，新增 `payees`
   付款對象主檔，會先刪除舊的 `expenses` 表（含裡面的資料）再重建。
+- `supabase/sql/05_crm.sql` — CRM 模組：`leads`（名單）、`contact_logs`（聯繫紀錄）、
+  `identity_weights`（身份權重設定，含初始資料）三張表、`leads_with_score` view，
+  以及名片/頭像照片用的 `photos` Storage bucket（私有）。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 
@@ -82,7 +85,14 @@ supabase functions deploy bot-rate
 2. 貼上 `supabase/sql/04_expense_documents.sql` 的全部內容，執行
 3. **這會刪除舊的 `expenses` 表**，如果裡面有不想遺失的資料要先自己備份
 
-### 7. 部署 GitHub Pages
+### 7. 建立 CRM 模組的資料表
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/05_crm.sql` 的全部內容，執行
+3. 如果 `insert into storage.buckets` 那段權限跑不過，改成手動在「Storage」頁面
+   建立名為 `photos` 的私有 bucket（做法同附件 bucket）
+
+### 8. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
