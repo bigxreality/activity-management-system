@@ -13,7 +13,9 @@
 - ✅ 權限系統細節（viewer 隱藏按鈕、管理員的使用者管理畫面）
 - ✅ 附件上傳（收據/票根/發票，存進 Supabase Storage 的 `attachments` bucket）
 - ✅ 費用明細改成「單據（一張發票/收據）+ 品項（可多筆）」兩層結構，含付款對象主檔
-- ✅ CRM 客戶名單模組（名單/聯繫紀錄/身份權重、草稿暫存、名片與頭像拍照上傳）
+- ✅ CRM 模組重新設計（公司／聯絡人取代名單、聯絡方式、參展紀錄、聯繫紀錄、待辦事項、
+  產品管理、多語系欄位＋RTL 文字方向偵測）
+- ⏳ 名片 AI 掃描辨識、離線掃描佇列、重複聯絡人偵測、客戶自填表單、草稿暫存 — 下一階段
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
 
@@ -40,6 +42,12 @@
   generated column），移除單據層級的 `attachments` 欄位。
 - `supabase/sql/07_profiles_department_title.sql` — `profiles` 表新增部門、職稱
   欄位，管理員可以在「使用者管理」畫面直接編輯。
+- `supabase/sql/08_crm_v2.sql` — **破壞性變更**：CRM 模組整個重新設計，`companies`
+  （公司）＋ `contacts`（聯絡人，取代 `leads`）＋ `contact_methods`（聯絡方式）＋
+  `event_contacts`（展覽 × 聯絡人）＋ `interactions`（聯繫紀錄，取代
+  `contact_logs`）＋ `tasks`（待辦事項）＋ `products`（感興趣產品清單，含初始
+  資料）＋ `business_cards` / `public_lead_submissions`（先建表，之後幾批才會接
+  上實際畫面），會先刪除舊的 `leads`／`contact_logs` 表（含裡面的資料）再重建。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 
@@ -109,7 +117,14 @@ supabase functions deploy bot-rate
 1. Supabase 後台左側「SQL Editor」
 2. 貼上 `supabase/sql/07_profiles_department_title.sql` 的全部內容，執行
 
-### 10. 部署 GitHub Pages
+### 10. CRM 模組重新設計（破壞性變更，會刪除舊的名單資料）
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/08_crm_v2.sql` 的全部內容，執行
+3. **這會刪除舊的 `leads`、`contact_logs` 表**，如果裡面有不想遺失的資料要先自己備份
+   （這兩張表是這幾天才剛做出來的測試功能，資料結構跟新版完全不同，無法自動轉換）
+
+### 11. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
