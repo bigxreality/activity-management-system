@@ -14,8 +14,14 @@
 //   需要帶登入者的 Authorization: Bearer <access_token>，只有 admin/editor 能用
 //   （這支會呼叫 Gemini API 產生費用，不開放 viewer 使用）
 
-import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// CORS 設定直接寫在這裡（不用 ../_shared/cors.ts），這樣整支函式是單一檔案，
+// 可以直接複製貼到 Supabase 後台的 Edge Functions 編輯器部署，不用裝 CLI。
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const GEMINI_MODEL = 'gemini-2.0-flash';
