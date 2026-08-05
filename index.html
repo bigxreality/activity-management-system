@@ -207,6 +207,7 @@
       <button data-view="dashboard" class="active">儀表板</button>
       <button data-view="expenses">費用明細</button>
       <button data-view="exhibitions">展覽總覽</button>
+      <button data-view="users" id="usersTabBtn" style="display:none;">使用者管理</button>
     </nav>
     <span class="user-chip"><span class="status-dot ok"></span><span id="userNameLabel"></span><span class="role-tag" id="userRoleLabel"></span></span>
     <button class="gear-btn" id="logoutBtn">登出</button>
@@ -381,6 +382,13 @@
     <div class="card"><div id="exhibitionTableWrap"></div></div>
   </section>
 
+  <!-- ============ USER MANAGEMENT (admin only) ============ -->
+  <section id="view-users" class="view">
+    <h2 class="view-title">使用者管理</h2>
+    <p class="view-desc">調整同事的角色。新增/刪除帳號本身要在 Supabase 後台的 Authentication 頁面操作，這裡只能改角色。</p>
+    <div class="card"><div id="usersTableWrap"></div></div>
+  </section>
+
 </main>
 
 <footer class="page-footer">
@@ -523,12 +531,29 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     currentUser = profRes.data;
     document.getElementById('userNameLabel').textContent = currentUser.name;
     document.getElementById('userRoleLabel').textContent = roleLabel(currentUser.role);
+    applyRolePermissions();
     await showAppShell();
     await loadState();
   }
 
   function roleLabel(role){
     return role === 'admin' ? '管理員' : role === 'editor' ? '編輯者' : role === 'viewer' ? '檢視者' : role;
+  }
+
+  // 這只是體驗優化（隱藏使用者用不到/沒權限的按鈕），真正的防呆是資料庫的 RLS 規則，
+  // 就算有人打開瀏覽器工具直接呼叫 Supabase API 一樣會被擋掉。
+  function applyRolePermissions(){
+    if(!currentUser) return;
+    var isViewer = currentUser.role === 'viewer';
+    var isAdmin = currentUser.role === 'admin';
+    document.getElementById('expenseFormCard').style.display = isViewer ? 'none' : '';
+    document.getElementById('exhibitionFormCard').style.display = isViewer ? 'none' : '';
+    document.getElementById('exportCsvBtn').style.display = isViewer ? 'none' : '';
+    document.getElementById('usersTabBtn').style.display = isAdmin ? '' : 'none';
+  }
+
+  function canWrite(){
+    return !!currentUser && currentUser.role !== 'viewer';
   }
 
   // ---------------- Tabs ----------------
@@ -539,6 +564,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if(btn.dataset.view === 'dashboard') renderDashboard();
+      if(btn.dataset.view === 'users') renderUsersTable();
     });
   });
 
@@ -652,11 +678,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   function renderAll(){
+    applyRolePermissions();
     refreshExhibitionSelects();
     refreshApplicantSelect();
     renderExpenseTable();
     renderExhibitionTable();
     renderDashboard();
+    if(currentUser && currentUser.role === 'admin' && document.getElementById('view-users').classList.contains('active')){
+      renderUsersTable();
+    }
   }
 
   document.getElementById('refreshBtn').addEventListener('click', function(){ loadState(); });
@@ -873,10 +903,11 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       return;
     }
     var total = rows.reduce(function(s,r){ return s + (Number(r.twd_amount)||0); }, 0);
+    var writable = canWrite();
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
       '<th>展覽</th><th>日期</th><th>類別</th><th>類型</th><th>申請人</th><th>項目</th><th>廠商</th>' +
       '<th class="num">原幣金額</th><th class="num">匯率</th><th class="num">台幣金額</th>' +
-      '<th>付款方式</th><th>發票</th><th>備註</th><th></th></tr></thead><tbody>';
+      '<th>付款方式</th><th>發票</th><th>備註</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
     rows.forEach(function(r){
       html += '<tr>' +
         '<td>' + escapeHtml(r.exhibition && r.exhibition.name) + '</td>' +
@@ -892,10 +923,10 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         '<td>' + escapeHtml(r.payment_method||'—') + '</td>' +
         '<td>' + escapeHtml(r.invoice||'—') + '</td>' +
         '<td>' + escapeHtml(r.note||'—') + '</td>' +
-        '<td><div class="row-actions">' +
+        (writable ? ('<td><div class="row-actions">' +
           '<button class="icon-btn" data-edit="' + r.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-del="' + r.id + '">刪除</button>' +
-        '</div></td></tr>';
+        '</div></td>') : '') + '</tr>';
     });
     html += '</tbody></table></div>';
     html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆</span><span>小計：NT$ ' + fmtInt(total) + '</span></div>';
@@ -1011,8 +1042,9 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       wrap.innerHTML = '<div class="empty-state"><div class="big">🗂️</div>尚未建立展覽，請於上方表單新增第一個展覽。</div>';
       return;
     }
+    var writable = canWrite();
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th>展覽名稱</th><th>國家</th><th>年度</th><th>展覽系列</th><th class="num">預算</th><th class="num">總成本</th><th class="num">差異</th><th>備註</th><th></th></tr></thead><tbody>';
+      '<th>展覽名稱</th><th>國家</th><th>年度</th><th>展覽系列</th><th class="num">預算</th><th class="num">總成本</th><th class="num">差異</th><th>備註</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
     state.exhibitions.forEach(function(ex){
       var budget = Number(ex.budget)||0;
       var cost = exhibitionCostById(ex.id);
@@ -1028,15 +1060,79 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         '<td class="num">NT$ ' + fmtInt(cost) + '</td>' +
         '<td class="num ' + diffClass + '">' + diffSign + '</td>' +
         '<td>' + escapeHtml(ex.note || '—') + '</td>' +
-        '<td><div class="row-actions">' +
+        (writable ? ('<td><div class="row-actions">' +
           '<button class="icon-btn" data-eedit="' + ex.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-edel="' + ex.id + '">刪除</button>' +
-        '</div></td></tr>';
+        '</div></td>') : '') + '</tr>';
     });
     html += '</tbody></table></div>';
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-eedit]').forEach(function(b){ b.addEventListener('click', function(){ editExhibition(b.dataset.eedit); }); });
     wrap.querySelectorAll('[data-edel]').forEach(function(b){ b.addEventListener('click', function(){ deleteExhibition(b.dataset.edel); }); });
+  }
+
+  // ---------------- 使用者管理（僅管理員） ----------------
+  // 新建/刪除 Supabase Auth 帳號要在 Supabase 後台操作，這裡只能改 profiles.role，
+  // 真正擋住非 admin 寫入的是 profiles 表的 RLS 規則，這裡的畫面本來就只有 admin 看得到。
+  var ROLE_OPTIONS = ['admin', 'editor', 'viewer'];
+
+  function renderUsersTable(){
+    var wrap = document.getElementById('usersTableWrap');
+    if(!currentUser || currentUser.role !== 'admin'){ wrap.innerHTML = ''; return; }
+    if(state.profiles.length === 0){
+      wrap.innerHTML = '<div class="empty-state"><div class="big">👤</div>尚無使用者資料。</div>';
+      return;
+    }
+    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>姓名</th><th>角色</th><th></th></tr></thead><tbody>';
+    state.profiles.forEach(function(u){
+      html += '<tr>' +
+        '<td class="mono">' + escapeHtml(u.email) + '</td>' +
+        '<td>' + escapeHtml(u.name) + '</td>' +
+        '<td><select data-role-select="' + u.id + '">' +
+          ROLE_OPTIONS.map(function(r){ return '<option value="' + r + '"' + (r === u.role ? ' selected' : '') + '>' + roleLabel(r) + '</option>'; }).join('') +
+        '</select></td>' +
+        '<td><button class="btn btn-ghost btn-sm" data-save-role="' + u.id + '">儲存</button></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-save-role]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.dataset.saveRole;
+        var sel = wrap.querySelector('[data-role-select="' + id + '"]');
+        updateUserRole(id, sel.value, sel, btn);
+      });
+    });
+  }
+
+  async function updateUserRole(id, newRole, selectEl, saveBtn){
+    var target = state.profiles.find(function(u){ return u.id === id; });
+    if(!target) return;
+    if(target.role === 'admin' && newRole !== 'admin'){
+      var otherAdmins = state.profiles.filter(function(u){ return u.role === 'admin' && u.id !== id; }).length;
+      if(otherAdmins === 0){
+        toast('至少要保留一位管理員，無法把最後一位管理員改成其他角色');
+        selectEl.value = target.role;
+        return;
+      }
+    }
+    saveBtn.disabled = true;
+    showLoading(true);
+    try{
+      var res = await supabase.from('profiles').update({ role: newRole }).eq('id', id);
+      if(res.error) throw res.error;
+      toast('已更新角色');
+      if(currentUser.id === id){
+        currentUser.role = newRole;
+        document.getElementById('userRoleLabel').textContent = roleLabel(newRole);
+      }
+      await loadState();
+    }catch(err){
+      toast('更新失敗：' + err.message);
+    }finally{
+      saveBtn.disabled = false;
+      showLoading(false);
+    }
   }
 
   // ---------------- Dashboard ----------------
