@@ -10,8 +10,8 @@
 ## 目前狀態
 
 - ✅ 費用明細 / 展覽總覽 / 儀表板（Supabase 版，含台銀歷史匯率查詢、PWA 基礎架構）
-- ⏳ 權限系統細節（viewer 隱藏按鈕、管理員的使用者管理畫面）— 下一階段
-- ⏳ 附件上傳（收據/票根，存進 Supabase Storage）— 下一階段
+- ✅ 權限系統細節（viewer 隱藏按鈕、管理員的使用者管理畫面）
+- ✅ 附件上傳（收據/票根/發票，存進 Supabase Storage 的 `attachments` bucket）
 - ⏳ CRM 客戶名單模組 — 下一階段
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
@@ -26,6 +26,8 @@
   在 Supabase 專案的 SQL Editor 貼上執行一次即可（可重複執行）。
 - `supabase/sql/02_set_initial_roles.sql` — 一次性設定五位使用者角色的腳本，
   **要等 Supabase Auth 帳號都建立好之後才能跑**。
+- `supabase/sql/03_attachments_storage.sql` — 建立費用明細附件用的 `attachments`
+  Storage bucket（私有）與權限規則。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 
@@ -62,7 +64,15 @@ supabase link --project-ref <你的 project ref>
 supabase functions deploy bot-rate
 ```
 
-### 5. 部署 GitHub Pages
+### 5. 建立附件用的 Storage bucket
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/03_attachments_storage.sql` 的全部內容，執行
+3. 如果 `insert into storage.buckets` 那段因為權限跑不過，改成手動在「Storage」頁面
+   按「New bucket」，名稱填 `attachments`，「Public bucket」開關**保持關閉**，
+   後面的權限規則（RLS policy）一樣會生效
+
+### 6. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
