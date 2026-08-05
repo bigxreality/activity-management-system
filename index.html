@@ -138,6 +138,13 @@
   .attach-preview-item button{margin-left:auto;}
   .attach-link{color:var(--accent-ink);text-decoration:none;font-size:12.5px;}
   .attach-link:hover{text-decoration:underline;}
+  .item-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;}
+  .item-row .field{margin-bottom:0;}
+  .sub-form-heading{font-family:var(--font-display);font-size:13.5px;font-weight:600;margin:0 0 12px;}
+  .sub-form-section{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);}
+  @media (max-width:520px){
+    .item-row{grid-template-columns:1fr;}
+  }
 
   .toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
   .toolbar-left{display:flex;gap:10px;align-items:center;}
@@ -251,10 +258,10 @@
   <!-- ============ EXPENSES ============ -->
   <section id="view-expenses" class="view">
     <h2 class="view-title">費用明細</h2>
-    <p class="view-desc">登錄每一筆展覽支出。選好幣別和日期後可以直接抓台灣銀行當天的匯率。</p>
+    <p class="view-desc">一張發票/收據登錄成一筆「單據」，底下可以有多個品項。匯率預設帶入台銀「現金賣出價」，任何時候都可以自行輸入或覆蓋修改。</p>
 
     <details class="card card-pad form-card" id="expenseFormCard" open>
-      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增費用</summary>
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增費用單據</summary>
       <form id="expenseForm">
         <div class="form-grid">
           <div class="field">
@@ -273,28 +280,28 @@
             <label>費用類型（自動帶出）</label>
             <div class="field-computed" id="f_expenseType">—</div>
           </div>
-          <div class="field" id="f_applicant_field" style="display:none;">
-            <label>申請人（代墊費用的同事） <span class="req">*</span></label>
-            <select id="f_applicant"></select>
-          </div>
           <div class="field">
-            <label>項目 <span class="req">*</span></label>
-            <input type="text" id="f_item" placeholder="例如：主視覺輸出" required>
+            <label>申請人／代墊人 <span class="req">*</span></label>
+            <select id="f_applicant" required></select>
           </div>
           <div class="field">
             <label>廠商</label>
             <input type="text" id="f_vendor" placeholder="廠商名稱">
+          </div>
+          <div class="field" id="f_route_from_field" style="display:none;">
+            <label>起點</label>
+            <input type="text" id="f_route_from" placeholder="例如：TPE、公司">
+          </div>
+          <div class="field" id="f_route_to_field" style="display:none;">
+            <label>迄點</label>
+            <input type="text" id="f_route_to" placeholder="例如：吉隆坡、世貿一館">
           </div>
           <div class="field">
             <label>幣別</label>
             <select id="f_currency"></select>
           </div>
           <div class="field">
-            <label>原幣金額 <span class="req">*</span></label>
-            <input type="number" id="f_amount" min="0" step="0.01" placeholder="0" required>
-          </div>
-          <div class="field">
-            <label>匯率</label>
+            <label>匯率（預設現金賣出價）</label>
             <div class="rate-row">
               <input type="number" id="f_rate" min="0" step="0.0001" value="1">
               <button type="button" class="btn-rate" id="fetchRateBtn">抓台銀匯率</button>
@@ -302,7 +309,7 @@
             <div class="rate-hint" id="rateHint"></div>
           </div>
           <div class="field">
-            <label>台幣金額（自動）</label>
+            <label>台幣金額合計（自動）</label>
             <div class="field-computed" id="f_twd_preview">NT$ 0</div>
           </div>
           <div class="field">
@@ -313,12 +320,89 @@
             <label>發票號碼</label>
             <input type="text" id="f_invoice" placeholder="選填">
           </div>
+        </div>
+
+        <div class="sub-form-section" id="f_payment_details_wrapper" style="display:none;">
+          <h4 class="sub-form-heading">支付明細（公用費用才需要）</h4>
+          <div class="form-grid">
+            <div class="field span-2">
+              <label>付款對象</label>
+              <select id="f_payee"></select>
+              <div id="f_payee_info" style="font-size:12px;color:var(--ink-faint);margin-top:4px;"></div>
+            </div>
+            <div class="field span-2" style="justify-content:flex-end;">
+              <button type="button" class="btn btn-ghost btn-sm" id="togglePayeePanelBtn">+ 新增付款對象</button>
+            </div>
+            <div class="field">
+              <label>付款條件</label>
+              <input type="text" id="f_payment_terms" placeholder="例如：月結30天">
+            </div>
+            <div class="field">
+              <label>預計付款日</label>
+              <input type="date" id="f_expected_payment_date">
+            </div>
+          </div>
+
+          <div id="payeeAddPanel" class="card card-pad" style="display:none;margin-top:12px;background:var(--surface-alt);">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label>付款對象名稱 <span class="req">*</span></label>
+                <input type="text" id="p_name" placeholder="廠商或收款人名稱">
+              </div>
+              <div class="field">
+                <label>銀行簡稱</label>
+                <input type="text" id="p_bank_short_name">
+              </div>
+              <div class="field">
+                <label>銀行代號</label>
+                <input type="text" id="p_bank_code">
+              </div>
+              <div class="field">
+                <label>分行別</label>
+                <input type="text" id="p_branch">
+              </div>
+              <div class="field">
+                <label>支票 NO.</label>
+                <input type="text" id="p_check_no">
+              </div>
+              <div class="field">
+                <label>銀行帳號</label>
+                <input type="text" id="p_bank_account">
+              </div>
+              <div class="field">
+                <label>銀行戶名</label>
+                <input type="text" id="p_account_holder">
+              </div>
+              <div class="field">
+                <label>SWIFT CODE</label>
+                <input type="text" id="p_swift_code" placeholder="國外銀行才需要">
+              </div>
+              <div class="field span-2">
+                <label>備註</label>
+                <input type="text" id="p_note">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="payeeSaveBtn">儲存付款對象</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="payeeCancelBtn">取消</button>
+              <span class="form-msg" id="payeeFormMsg"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-form-section">
+          <h4 class="sub-form-heading">品項 <span class="req">*</span></h4>
+          <div id="itemRowsWrap"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="addItemRowBtn">+ 新增品項</button>
+        </div>
+
+        <div class="form-grid" style="margin-top:16px;">
           <div class="field span-2">
             <label>備註</label>
             <input type="text" id="f_note" placeholder="選填">
           </div>
           <div class="field span-2">
-            <label>附件（收據/票根/發票，可複選）</label>
+            <label>附件（收據/票根/發票，可複選，掛在整張單據上）</label>
             <input type="file" id="f_attach_camera" accept="image/*" capture="environment" style="display:none;">
             <input type="file" id="f_attach_files" accept="image/*" multiple style="display:none;">
             <div style="display:flex;gap:8px;">
@@ -328,8 +412,9 @@
             <div id="attachPreviewList"></div>
           </div>
         </div>
+
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary" id="expenseSubmitBtn">新增費用</button>
+          <button type="submit" class="btn btn-primary" id="expenseSubmitBtn">新增單據</button>
           <button type="button" class="btn btn-ghost" id="expenseCancelBtn" style="display:none;">取消編輯</button>
           <span class="form-msg" id="expenseFormMsg"></span>
         </div>
@@ -433,15 +518,21 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   "use strict";
 
   // ---------------- Constants ----------------
-  // 費用類別分成「個人費用」（員工代墊、事後跑差旅報告單核銷，一定要綁申請人）
-  // 與「展覽公用費用」（跟展覽本身綁定，跑請款單），選好類別後費用類型自動帶出
+  // 分類原則：「這筆錢最後算誰／哪個對象的支出」，跟「誰先掏錢代墊」無關——
+  // 所有費用一律是同事先代墊、事後核銷，所以每一筆單據不分類別都要填申請人。
+  // 個人費用：跑差旅報告單，屬於某個人出差當下的花費。
+  // 展覽公用費用：跑請款單，算展覽本身的營運成本。「人員」是指現場雇用的
+  // 翻譯/showgirl/工讀生等展覽本身需要的人力，即使同事代墊付現，成本歸屬
+  // 還是展覽公用，不是那位同事的個人出差費用。
   var CATEGORY_GROUPS = [
-    { type:'個人', label:'個人費用', items:["機票","交通","住宿","餐費","交際費","人員"] },
-    { type:'公用', label:'展覽公用費用', items:["攤位費","裝潢","設計","印刷","設備租借","運輸","保險","行銷宣傳","贈品","雜支"] }
+    { type:'個人', label:'個人費用（差旅報告單）', items:["機票","交通","住宿","餐費","交際費"] },
+    { type:'公用', label:'展覽公用費用（請款單）', items:["攤位費","裝潢","設計","印刷","設備租借","運輸","保險","行銷宣傳","贈品","雜支","人員"] }
   ];
   var CATEGORIES = CATEGORY_GROUPS.reduce(function(acc,g){ return acc.concat(g.items); }, []);
   var CATEGORY_TYPE = {};
   CATEGORY_GROUPS.forEach(function(g){ g.items.forEach(function(c){ CATEGORY_TYPE[c] = g.type; }); });
+  // 起訖地點欄位只在這幾個類別顯示
+  var ROUTE_CATEGORIES = ["機票","交通","運輸"];
   var PAYMENTS = ["匯款","公司卡","現金","其他"];
   // 常見國家清單，展覽總覽的「國家」下拉選單用
   var COUNTRIES = ["台灣","中國","香港","澳門","日本","韓國","新加坡","馬來西亞","泰國","越南","印尼","菲律賓","印度",
@@ -470,7 +561,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   // ---------------- State ----------------
-  var state = { exhibitions: [], expenses: [], profiles: [] };
+  var state = { exhibitions: [], documents: [], profiles: [], payees: [] };
   var currentUser = null; // { id, email, name, role }
   var editingExpenseId = null;
   var editingExhibitionId = null;
@@ -668,6 +759,17 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     fillSelect(document.getElementById('f_applicant'), state.profiles, '請選擇申請人', 'id', 'name');
   }
 
+  function refreshPayeeSelect(){
+    var sel = document.getElementById('f_payee');
+    var keep = sel.value;
+    sel.innerHTML = '';
+    var ph = document.createElement('option'); ph.value=''; ph.textContent='未指定付款對象（選填）'; sel.appendChild(ph);
+    state.payees.forEach(function(p){
+      var o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o);
+    });
+    if(state.payees.some(function(p){return p.id===keep;})) sel.value = keep;
+  }
+
   // ---------------- Data layer (Supabase) ----------------
   async function loadState(){
     document.getElementById('connErrorBanner').style.display = 'none';
@@ -675,16 +777,22 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     try{
       var exRes = await supabase.from('exhibitions').select('*').order('created_at', { ascending:false });
       if(exRes.error) throw exRes.error;
-      var expRes = await supabase.from('expenses')
-        .select('*, exhibition:exhibitions!exhibition_id(id,name), applicant:profiles!applicant_id(id,name)')
+      var docRes = await supabase.from('expense_documents')
+        .select('*, exhibition:exhibitions!exhibition_id(id,name), applicant:profiles!applicant_id(id,name), payee:payees!payee_id(*), items:expense_items(*)')
         .order('date', { ascending:false });
-      if(expRes.error) throw expRes.error;
+      if(docRes.error) throw docRes.error;
       var profRes = await supabase.from('profiles').select('id,email,name,role').order('name');
       if(profRes.error) throw profRes.error;
+      var payeeRes = await supabase.from('payees').select('*').order('name');
+      if(payeeRes.error) throw payeeRes.error;
 
       state.exhibitions = exRes.data || [];
-      state.expenses = expRes.data || [];
+      state.documents = (docRes.data || []).map(function(d){
+        d.items = (d.items || []).slice().sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); });
+        return d;
+      });
       state.profiles = profRes.data || [];
+      state.payees = payeeRes.data || [];
       renderAll();
     }catch(err){
       var banner = document.getElementById('connErrorBanner');
@@ -695,10 +803,16 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     }
   }
 
+  async function loadPayees(){
+    var res = await supabase.from('payees').select('*').order('name');
+    if(!res.error) state.payees = res.data || [];
+  }
+
   function renderAll(){
     applyRolePermissions();
     refreshExhibitionSelects();
     refreshApplicantSelect();
+    refreshPayeeSelect();
     renderExpenseTable();
     renderExhibitionTable();
     renderDashboard();
@@ -714,29 +828,130 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   elDate.value = new Date().toISOString().slice(0,10);
 
   function updateTwdPreview(){
-    var amount = parseFloat(document.getElementById('f_amount').value) || 0;
     var rate = parseFloat(document.getElementById('f_rate').value) || 0;
-    document.getElementById('f_twd_preview').textContent = 'NT$ ' + fmtInt(amount * rate);
+    var total = 0;
+    document.querySelectorAll('#itemRowsWrap .item-amount').forEach(function(inp){ total += parseFloat(inp.value) || 0; });
+    document.getElementById('f_twd_preview').textContent = 'NT$ ' + fmtInt(total * rate);
   }
-  document.getElementById('f_amount').addEventListener('input', updateTwdPreview);
   document.getElementById('f_rate').addEventListener('input', updateTwdPreview);
+
+  // ---------------- 品項（一張單據可以有多筆） ----------------
+  function itemRowNode(values){
+    values = values || {};
+    var div = document.createElement('div');
+    div.className = 'item-row';
+    div.innerHTML =
+      '<div class="field"><label>品名摘要 <span class="req">*</span></label><input type="text" class="item-name" placeholder="例如：螢幕租借" value="' + escapeHtml(values.item||'') + '"></div>' +
+      '<div class="field"><label>金額 <span class="req">*</span></label><input type="number" class="item-amount" min="0" step="0.01" placeholder="0" value="' + (values.amount!=null?values.amount:'') + '"></div>' +
+      '<div class="field"><label>稅額（選填）</label><input type="number" class="item-tax" min="0" step="0.01" placeholder="0" value="' + (values.taxAmount!=null?values.taxAmount:'') + '"></div>' +
+      '<button type="button" class="icon-btn danger item-remove-btn">移除</button>';
+    return div;
+  }
+  function addItemRow(values){
+    var wrap = document.getElementById('itemRowsWrap');
+    var row = itemRowNode(values);
+    wrap.appendChild(row);
+    row.querySelector('.item-amount').addEventListener('input', updateTwdPreview);
+    row.querySelector('.item-remove-btn').addEventListener('click', function(){
+      if(wrap.children.length <= 1){ toast('至少要保留一筆品項'); return; }
+      row.remove();
+      updateTwdPreview();
+    });
+  }
+  function clearItemRows(){ document.getElementById('itemRowsWrap').innerHTML = ''; }
+  function getItemRowsData(){
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#itemRowsWrap .item-row'));
+    var result = [];
+    rows.forEach(function(row){
+      var item = row.querySelector('.item-name').value.trim();
+      var amountStr = row.querySelector('.item-amount').value;
+      var taxStr = row.querySelector('.item-tax').value;
+      if(!item && !amountStr) return; // 跳過完全空白的多餘列
+      result.push({ item: item, amount: parseFloat(amountStr), taxAmount: taxStr ? parseFloat(taxStr) : 0 });
+    });
+    return result;
+  }
+  document.getElementById('addItemRowBtn').addEventListener('click', function(){ addItemRow(); });
+
+  function updateRouteFieldsVisibility(category){
+    var show = ROUTE_CATEGORIES.indexOf(category) >= 0;
+    document.getElementById('f_route_from_field').style.display = show ? '' : 'none';
+    document.getElementById('f_route_to_field').style.display = show ? '' : 'none';
+  }
+
+  function updatePaymentDetailsVisibility(type){
+    document.getElementById('f_payment_details_wrapper').style.display = (type === '公用') ? '' : 'none';
+  }
 
   function updateExpenseTypeState(){
     var category = document.getElementById('f_category').value;
     var type = CATEGORY_TYPE[category] || '';
     document.getElementById('f_expenseType').textContent = type || '—';
-    var applicantField = document.getElementById('f_applicant_field');
-    var applicantSel = document.getElementById('f_applicant');
-    if(type === '個人'){
-      applicantField.style.display = '';
-      applicantSel.required = true;
-    } else {
-      applicantField.style.display = 'none';
-      applicantSel.required = false;
-      applicantSel.value = '';
-    }
+    updatePaymentDetailsVisibility(type);
+    updateRouteFieldsVisibility(category);
   }
   document.getElementById('f_category').addEventListener('change', updateExpenseTypeState);
+
+  // ---------------- 付款對象 ----------------
+  document.getElementById('f_payee').addEventListener('change', renderPayeeInfo);
+  function renderPayeeInfo(){
+    var id = document.getElementById('f_payee').value;
+    var el = document.getElementById('f_payee_info');
+    var p = state.payees.find(function(x){ return x.id === id; });
+    if(!p){ el.textContent = ''; return; }
+    var parts = [];
+    if(p.bank_short_name) parts.push('銀行：' + p.bank_short_name + (p.bank_code ? '（' + p.bank_code + '）' : ''));
+    if(p.branch) parts.push('分行：' + p.branch);
+    if(p.bank_account) parts.push('帳號：' + p.bank_account);
+    if(p.account_holder) parts.push('戶名：' + p.account_holder);
+    if(p.swift_code) parts.push('SWIFT：' + p.swift_code);
+    if(p.check_no) parts.push('支票NO.：' + p.check_no);
+    el.textContent = parts.length ? parts.join('　') : '（這個付款對象尚未填銀行資訊）';
+  }
+
+  document.getElementById('togglePayeePanelBtn').addEventListener('click', function(){
+    var panel = document.getElementById('payeeAddPanel');
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  });
+  document.getElementById('payeeCancelBtn').addEventListener('click', hidePayeePanel);
+  function hidePayeePanel(){
+    document.getElementById('payeeAddPanel').style.display = 'none';
+    ['p_name','p_bank_short_name','p_bank_code','p_branch','p_check_no','p_bank_account','p_account_holder','p_swift_code','p_note'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('payeeFormMsg').textContent = '';
+  }
+  document.getElementById('payeeSaveBtn').addEventListener('click', async function(){
+    var msg = document.getElementById('payeeFormMsg');
+    var name = document.getElementById('p_name').value.trim();
+    if(!name){ msg.textContent = '請填寫付款對象名稱'; return; }
+    var payload = {
+      name: name,
+      bank_short_name: document.getElementById('p_bank_short_name').value.trim() || null,
+      bank_code: document.getElementById('p_bank_code').value.trim() || null,
+      branch: document.getElementById('p_branch').value.trim() || null,
+      check_no: document.getElementById('p_check_no').value.trim() || null,
+      bank_account: document.getElementById('p_bank_account').value.trim() || null,
+      account_holder: document.getElementById('p_account_holder').value.trim() || null,
+      swift_code: document.getElementById('p_swift_code').value.trim() || null,
+      note: document.getElementById('p_note').value.trim() || null
+    };
+    showLoading(true);
+    try{
+      var res = await supabase.from('payees').insert(payload).select().single();
+      if(res.error) throw res.error;
+      await loadPayees();
+      refreshPayeeSelect();
+      document.getElementById('f_payee').value = res.data.id;
+      renderPayeeInfo();
+      hidePayeePanel();
+      toast('已新增付款對象');
+    }catch(err){
+      msg.textContent = '儲存失敗：' + err.message;
+    }finally{
+      showLoading(false);
+    }
+  });
 
   function updateRateButtonState(){
     var currency = document.getElementById('f_currency').value;
@@ -790,10 +1005,11 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       var data = await fetchBotRate(date, currency);
       if(data.error){ hint.textContent = data.error; }
       else{
-        var rate = data.spotSell || data.spotBuy || data.cashSell || data.cashBuy;
+        // 財務核算用「現金賣出價」當預設值，不是即期賣出；欄位隨時可以手動覆蓋修改
+        var rate = data.cashSell || data.spotSell || data.cashBuy || data.spotBuy;
         document.getElementById('f_rate').value = rate;
         updateTwdPreview();
-        hint.textContent = '即期賣出 ' + fmtNum(data.spotSell,4) + '　即期買入 ' + fmtNum(data.spotBuy,4) +
+        hint.textContent = '現金賣出 ' + fmtNum(data.cashSell,4) + '（已帶入）　即期賣出 ' + fmtNum(data.spotSell,4) +
           (data.usedFallback ? '（' + date + ' 無資料，改用 ' + data.date + ' 匯率）' : '（' + data.date + '）');
       }
     }catch(err){
@@ -874,11 +1090,16 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('f_currency').value = 'TWD';
     updateRateButtonState();
     updateExpenseTypeState();
+    clearItemRows();
+    addItemRow();
+    updateTwdPreview();
+    hidePayeePanel();
+    renderPayeeInfo();
     editingExpenseId = null;
     pendingAttachmentFiles = [];
     existingAttachments = [];
     renderAttachPreview();
-    document.getElementById('expenseSubmitBtn').textContent = '新增費用';
+    document.getElementById('expenseSubmitBtn').textContent = '新增單據';
     document.getElementById('expenseCancelBtn').style.display = 'none';
     document.getElementById('expenseFormMsg').textContent = '';
   }
@@ -889,53 +1110,74 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var msg = document.getElementById('expenseFormMsg');
     var exhibitionId = document.getElementById('f_exhibition').value;
     if(!exhibitionId){ msg.textContent = '請先新增展覽並選擇展覽'; return; }
-    var amount = parseFloat(document.getElementById('f_amount').value);
-    var rate = parseFloat(document.getElementById('f_rate').value);
-    if(!(amount >= 0) || !(rate >= 0)){ msg.textContent = '金額與匯率需為正數'; return; }
     var category = document.getElementById('f_category').value;
+    if(!category){ msg.textContent = '請選擇費用類別'; return; }
     var expenseType = CATEGORY_TYPE[category] || '';
     var applicantId = document.getElementById('f_applicant').value;
-    if(expenseType === '個人' && !applicantId){ msg.textContent = '個人費用請選擇申請人'; return; }
+    if(!applicantId){ msg.textContent = '請選擇申請人／代墊人'; return; }
+    var rate = parseFloat(document.getElementById('f_rate').value);
+    if(!(rate >= 0)){ msg.textContent = '匯率需為正數'; return; }
+    var items = getItemRowsData();
+    if(items.length === 0){ msg.textContent = '請至少填寫一筆品項（品名摘要與金額）'; return; }
+    for(var i = 0; i < items.length; i++){
+      if(!items[i].item || !(items[i].amount >= 0)){ msg.textContent = '每一筆品項的品名摘要與金額都要填寫'; return; }
+    }
+
+    var isRoute = ROUTE_CATEGORIES.indexOf(category) >= 0;
+    var isPublic = expenseType === '公用';
 
     var payload = {
       exhibition_id: exhibitionId,
       date: document.getElementById('f_date').value,
       category: category,
       expense_type: expenseType,
-      applicant_id: expenseType === '個人' ? applicantId : null,
-      item: document.getElementById('f_item').value.trim(),
+      applicant_id: applicantId,
       vendor: document.getElementById('f_vendor').value.trim(),
+      route_from: isRoute ? document.getElementById('f_route_from').value.trim() : null,
+      route_to: isRoute ? document.getElementById('f_route_to').value.trim() : null,
       currency: document.getElementById('f_currency').value,
-      amount: amount,
       rate: rate,
       payment_method: document.getElementById('f_payment').value,
-      invoice: document.getElementById('f_invoice').value.trim(),
+      invoice_no: document.getElementById('f_invoice').value.trim(),
+      payee_id: isPublic ? (document.getElementById('f_payee').value || null) : null,
+      payment_terms: isPublic ? document.getElementById('f_payment_terms').value.trim() : null,
+      expected_payment_date: isPublic ? (document.getElementById('f_expected_payment_date').value || null) : null,
       note: document.getElementById('f_note').value.trim()
     };
 
     showLoading(true);
     try{
-      var expenseId = editingExpenseId || crypto.randomUUID();
-      var newPaths = await uploadPendingAttachments(expenseId);
+      var documentId = editingExpenseId || crypto.randomUUID();
+      var newPaths = await uploadPendingAttachments(documentId);
       var finalAttachments = existingAttachments.concat(newPaths);
       payload.attachments = finalAttachments;
 
       var res;
       var removedPaths = [];
       if(editingExpenseId){
-        var rec = state.expenses.find(function(x){ return x.id === editingExpenseId; });
+        var rec = state.documents.find(function(x){ return x.id === editingExpenseId; });
         removedPaths = (rec && rec.attachments || []).filter(function(p){ return finalAttachments.indexOf(p) === -1; });
-        res = await supabase.from('expenses').update(payload).eq('id', editingExpenseId);
+        res = await supabase.from('expense_documents').update(payload).eq('id', editingExpenseId);
+        if(res.error) throw res.error;
+        var delRes = await supabase.from('expense_items').delete().eq('document_id', editingExpenseId);
+        if(delRes.error) throw delRes.error;
       } else {
-        payload.id = expenseId;
+        payload.id = documentId;
         payload.created_by = currentUser.id;
-        res = await supabase.from('expenses').insert(payload);
+        res = await supabase.from('expense_documents').insert(payload);
+        if(res.error) throw res.error;
       }
-      if(res.error) throw res.error;
+
+      var itemsPayload = items.map(function(it, idx){
+        return { document_id: documentId, item: it.item, amount: it.amount, tax_amount: it.taxAmount || 0, sort_order: idx };
+      });
+      var itemsRes = await supabase.from('expense_items').insert(itemsPayload);
+      if(itemsRes.error) throw itemsRes.error;
+
       if(removedPaths.length){
         supabase.storage.from('attachments').remove(removedPaths).catch(function(){}); // 清理舊檔案，失敗不影響主流程
       }
-      toast(editingExpenseId ? '已更新費用' : '已新增費用');
+      toast(editingExpenseId ? '已更新單據' : '已新增單據');
       resetExpenseForm();
       await loadState();
     }catch(err){
@@ -946,7 +1188,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   });
 
   function editExpense(id){
-    var rec = state.expenses.find(function(x){ return x.id === id; });
+    var rec = state.documents.find(function(x){ return x.id === id; });
     if(!rec) return;
     editingExpenseId = id;
     document.getElementById('expenseFormCard').open = true;
@@ -955,32 +1197,40 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('f_category').value = rec.category;
     updateExpenseTypeState();
     document.getElementById('f_applicant').value = rec.applicant_id || '';
-    document.getElementById('f_item').value = rec.item;
-    document.getElementById('f_vendor').value = rec.vendor;
+    document.getElementById('f_vendor').value = rec.vendor || '';
+    document.getElementById('f_route_from').value = rec.route_from || '';
+    document.getElementById('f_route_to').value = rec.route_to || '';
     suppressAutoFetch = true;
     document.getElementById('f_currency').value = rec.currency;
     updateRateButtonState();
-    document.getElementById('f_amount').value = rec.amount;
     document.getElementById('f_rate').value = rec.rate;
-    document.getElementById('f_payment').value = rec.payment_method;
-    document.getElementById('f_invoice').value = rec.invoice;
-    document.getElementById('f_note').value = rec.note;
+    document.getElementById('f_payment').value = rec.payment_method || '';
+    document.getElementById('f_invoice').value = rec.invoice_no || '';
+    document.getElementById('f_payee').value = rec.payee_id || '';
+    renderPayeeInfo();
+    document.getElementById('f_payment_terms').value = rec.payment_terms || '';
+    document.getElementById('f_expected_payment_date').value = rec.expected_payment_date || '';
+    document.getElementById('f_note').value = rec.note || '';
+    clearItemRows();
+    var items = (rec.items || []).slice().sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); });
+    if(items.length === 0){ addItemRow(); }
+    else { items.forEach(function(it){ addItemRow({ item: it.item, amount: it.amount, taxAmount: it.tax_amount }); }); }
     updateTwdPreview();
     suppressAutoFetch = false;
     pendingAttachmentFiles = [];
     existingAttachments = (rec.attachments || []).slice();
     renderAttachPreview();
-    document.getElementById('expenseSubmitBtn').textContent = '更新費用';
+    document.getElementById('expenseSubmitBtn').textContent = '更新單據';
     document.getElementById('expenseCancelBtn').style.display = 'inline-block';
     document.getElementById('expenseFormCard').scrollIntoView({behavior:'smooth', block:'start'});
   }
 
   async function deleteExpense(id){
-    if(!confirm('確定要刪除這筆費用嗎？')) return;
-    var rec = state.expenses.find(function(x){ return x.id === id; });
+    if(!confirm('確定要刪除這筆單據嗎？（底下的品項會一併刪除）')) return;
+    var rec = state.documents.find(function(x){ return x.id === id; });
     showLoading(true);
     try{
-      var res = await supabase.from('expenses').delete().eq('id', id);
+      var res = await supabase.from('expense_documents').delete().eq('id', id);
       if(res.error) throw res.error;
       if(rec && rec.attachments && rec.attachments.length){
         supabase.storage.from('attachments').remove(rec.attachments).catch(function(){}); // 一併清掉附件檔案，失敗不影響主流程
@@ -996,51 +1246,87 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
 
   document.getElementById('expenseFilter').addEventListener('change', renderExpenseTable);
 
+  function documentOrigTotal(doc){
+    return (doc.items || []).reduce(function(s,i){ return s + (Number(i.amount)||0); }, 0);
+  }
+  function documentTwdTotal(doc){
+    return documentOrigTotal(doc) * (Number(doc.rate)||0);
+  }
+
   function renderExpenseTable(){
     var wrap = document.getElementById('expenseTableWrap');
     var filterId = document.getElementById('expenseFilter').value;
-    var rows = state.expenses.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
+    var rows = state.documents.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
     rows = rows.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
 
     if(rows.length === 0){
-      wrap.innerHTML = '<div class="empty-state"><div class="big">📋</div>尚未有費用資料，請於上方表單新增第一筆支出。</div>';
+      wrap.innerHTML = '<div class="empty-state"><div class="big">📋</div>尚未有費用資料，請於上方表單新增第一筆單據。</div>';
       return;
     }
-    var total = rows.reduce(function(s,r){ return s + (Number(r.twd_amount)||0); }, 0);
+    var grandTotal = rows.reduce(function(s,r){ return s + documentTwdTotal(r); }, 0);
     var writable = canWrite();
+    var colspan = writable ? 15 : 14;
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th>展覽</th><th>日期</th><th>類別</th><th>類型</th><th>申請人</th><th>項目</th><th>廠商</th>' +
-      '<th class="num">原幣金額</th><th class="num">匯率</th><th class="num">台幣金額</th>' +
-      '<th>付款方式</th><th>發票</th><th>備註</th><th>附件</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
+      '<th></th><th>展覽</th><th>日期</th><th>類別</th><th>類型</th><th>申請人</th><th>廠商</th>' +
+      '<th class="num">品項數</th><th class="num">原幣總額</th><th class="num">匯率</th><th class="num">台幣總額</th>' +
+      '<th>付款方式</th><th>發票號碼</th><th>附件</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
     rows.forEach(function(r){
+      var items = r.items || [];
+      var origTotal = documentOrigTotal(r);
+      var twdTotal = origTotal * (Number(r.rate)||0);
       html += '<tr>' +
+        '<td><button type="button" class="icon-btn" data-toggle-items="' + r.id + '">▸</button></td>' +
         '<td>' + escapeHtml(r.exhibition && r.exhibition.name) + '</td>' +
         '<td class="mono">' + escapeHtml(r.date) + '</td>' +
         '<td><span class="tag" style="color:' + categoryColor(r.category) + ';">' + escapeHtml(r.category) + '</span></td>' +
         '<td>' + escapeHtml(r.expense_type||'—') + '</td>' +
         '<td>' + escapeHtml(r.applicant && r.applicant.name || '—') + '</td>' +
-        '<td>' + escapeHtml(r.item) + '</td>' +
         '<td>' + escapeHtml(r.vendor||'—') + '</td>' +
-        '<td class="num">' + fmtNum(r.amount) + ' ' + escapeHtml(r.currency) + '</td>' +
+        '<td class="num">' + items.length + '</td>' +
+        '<td class="num">' + fmtNum(origTotal) + ' ' + escapeHtml(r.currency) + '</td>' +
         '<td class="num">' + fmtNum(r.rate, 4) + '</td>' +
-        '<td class="num" style="font-weight:600;">NT$ ' + fmtInt(r.twd_amount) + '</td>' +
+        '<td class="num" style="font-weight:600;">NT$ ' + fmtInt(twdTotal) + '</td>' +
         '<td>' + escapeHtml(r.payment_method||'—') + '</td>' +
-        '<td>' + escapeHtml(r.invoice||'—') + '</td>' +
-        '<td>' + escapeHtml(r.note||'—') + '</td>' +
+        '<td>' + escapeHtml(r.invoice_no||'—') + '</td>' +
         '<td>' + renderAttachmentLinks(r.attachments) + '</td>' +
         (writable ? ('<td><div class="row-actions">' +
           '<button class="icon-btn" data-edit="' + r.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-del="' + r.id + '">刪除</button>' +
         '</div></td>') : '') + '</tr>';
+      html += '<tr class="item-detail-row" data-items-row="' + r.id + '" style="display:none;">' +
+        '<td colspan="' + colspan + '" style="background:var(--surface-alt);padding:0;">' +
+        renderItemsSubtable(items, r.currency) +
+        '</td></tr>';
     });
     html += '</tbody></table></div>';
-    html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆</span><span>小計：NT$ ' + fmtInt(total) + '</span></div>';
+    html += '<div class="table-footer"><span>共 ' + rows.length + ' 筆單據</span><span>台幣總計：NT$ ' + fmtInt(grandTotal) + '</span></div>';
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-edit]').forEach(function(b){ b.addEventListener('click', function(){ editExpense(b.dataset.edit); }); });
     wrap.querySelectorAll('[data-del]').forEach(function(b){ b.addEventListener('click', function(){ deleteExpense(b.dataset.del); }); });
     wrap.querySelectorAll('[data-attach-path]').forEach(function(a){
       a.addEventListener('click', function(ev){ ev.preventDefault(); openAttachment(a.dataset.attachPath); });
     });
+    wrap.querySelectorAll('[data-toggle-items]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var id = b.dataset.toggleItems;
+        var row = wrap.querySelector('[data-items-row="' + id + '"]');
+        var showing = row.style.display !== 'none';
+        row.style.display = showing ? 'none' : 'table-row';
+        b.textContent = showing ? '▸' : '▾';
+      });
+    });
+  }
+
+  function renderItemsSubtable(items, currency){
+    if(!items || items.length === 0) return '<div style="padding:10px 16px;color:var(--ink-faint);font-size:12.5px;">尚無品項</div>';
+    var html = '<table style="margin:0;"><thead><tr><th style="padding-left:40px;">品名摘要</th><th class="num">金額</th><th class="num">稅額</th></tr></thead><tbody>';
+    items.slice().sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); }).forEach(function(it){
+      html += '<tr><td style="padding-left:40px;">' + escapeHtml(it.item) + '</td>' +
+        '<td class="num">' + fmtNum(it.amount) + ' ' + escapeHtml(currency) + '</td>' +
+        '<td class="num">' + (it.tax_amount ? fmtNum(it.tax_amount) : '—') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    return html;
   }
 
   function renderAttachmentLinks(paths){
@@ -1053,20 +1339,24 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
 
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
     var filterId = document.getElementById('expenseFilter').value;
-    var rows = state.expenses.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
-    var header = ['展覽','日期','費用類別','費用類型','申請人','項目','廠商','幣別','原幣金額','匯率','台幣金額','付款方式','發票','備註'];
+    var rows = state.documents.filter(function(x){ return !filterId || x.exhibition_id === filterId; });
+    var header = ['展覽','日期','費用類別','費用類型','申請人','廠商','起點','迄點','品名摘要','原幣金額','稅額','幣別','匯率','台幣金額','付款方式','發票號碼','備註'];
     var lines = [header.join(',')];
     rows.forEach(function(r){
-      var line = [
-        r.exhibition && r.exhibition.name, r.date, r.category, r.expense_type,
-        r.applicant && r.applicant.name, r.item, r.vendor, r.currency, r.amount, r.rate,
-        r.twd_amount, r.payment_method, r.invoice, r.note
-      ].map(function(v){ v = (v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(v) ? '"' + v + '"' : v; });
-      lines.push(line.join(','));
+      var items = (r.items && r.items.length) ? r.items : [{ item:'', amount:0, tax_amount:0 }];
+      items.forEach(function(it){
+        var line = [
+          r.exhibition && r.exhibition.name, r.date, r.category, r.expense_type,
+          r.applicant && r.applicant.name, r.vendor, r.route_from, r.route_to,
+          it.item, it.amount, it.tax_amount, r.currency, r.rate, (Number(it.amount)||0) * (Number(r.rate)||0),
+          r.payment_method, r.invoice_no, r.note
+        ].map(function(v){ v = (v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(v) ? '"' + v + '"' : v; });
+        lines.push(line.join(','));
+      });
     });
     var blob = new Blob(["﻿" + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
     var url = URL.createObjectURL(blob);
-    var a = document.createElement('a'); a.href = url; a.download = '展覽費用明細.csv';
+    var a = document.createElement('a'); a.href = url; a.download = '費用單據明細.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
@@ -1149,7 +1439,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   function exhibitionCostById(id){
-    return state.expenses.reduce(function(s,e){ return e.exhibition_id===id ? s+(Number(e.twd_amount)||0) : s; }, 0);
+    return state.documents.reduce(function(s,d){ return d.exhibition_id===id ? s+documentTwdTotal(d) : s; }, 0);
   }
 
   function renderExhibitionTable(){
@@ -1254,7 +1544,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   // ---------------- Dashboard ----------------
   function renderStatCards(){
     var totalBudget = state.exhibitions.reduce(function(s,e){ return s + (Number(e.budget)||0); }, 0);
-    var totalCost = state.expenses.reduce(function(s,e){ return s + (Number(e.twd_amount)||0); }, 0);
+    var totalCost = state.documents.reduce(function(s,d){ return s + documentTwdTotal(d); }, 0);
     var diff = totalBudget - totalCost;
     var grid = document.getElementById('statGrid');
     grid.innerHTML =
@@ -1292,7 +1582,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     }
 
     var catTotals = {};
-    state.expenses.forEach(function(e){ catTotals[e.category] = (catTotals[e.category]||0) + (Number(e.twd_amount)||0); });
+    state.documents.forEach(function(d){ catTotals[d.category] = (catTotals[d.category]||0) + documentTwdTotal(d); });
     var catKeys = Object.keys(catTotals);
     if(catKeys.length === 0){
       categoryCanvas.style.display='none';
@@ -1354,8 +1644,11 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('f_currency').value = 'TWD';
     fillSelect(document.getElementById('f_payment'), PAYMENTS, '請選擇付款方式');
     fillSelect(document.getElementById('e_country'), COUNTRIES, '請選擇國家（選填）');
+    clearItemRows();
+    addItemRow();
     updateRateButtonState();
     updateExpenseTypeState();
+    updateTwdPreview();
 
     if(!IS_CONFIGURED){
       showAuthScreen();

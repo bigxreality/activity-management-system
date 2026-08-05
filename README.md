@@ -12,6 +12,7 @@
 - ✅ 費用明細 / 展覽總覽 / 儀表板（Supabase 版，含台銀歷史匯率查詢、PWA 基礎架構）
 - ✅ 權限系統細節（viewer 隱藏按鈕、管理員的使用者管理畫面）
 - ✅ 附件上傳（收據/票根/發票，存進 Supabase Storage 的 `attachments` bucket）
+- ✅ 費用明細改成「單據（一張發票/收據）+ 品項（可多筆）」兩層結構，含付款對象主檔
 - ⏳ CRM 客戶名單模組 — 下一階段
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
@@ -28,6 +29,9 @@
   **要等 Supabase Auth 帳號都建立好之後才能跑**。
 - `supabase/sql/03_attachments_storage.sql` — 建立費用明細附件用的 `attachments`
   Storage bucket（私有）與權限規則。
+- `supabase/sql/04_expense_documents.sql` — **破壞性變更**：把費用明細改成
+  「單據 `expense_documents` + 品項 `expense_items`」兩層結構，新增 `payees`
+  付款對象主檔，會先刪除舊的 `expenses` 表（含裡面的資料）再重建。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 
@@ -72,7 +76,13 @@ supabase functions deploy bot-rate
    按「New bucket」，名稱填 `attachments`，「Public bucket」開關**保持關閉**，
    後面的權限規則（RLS policy）一樣會生效
 
-### 6. 部署 GitHub Pages
+### 6. 費用明細改成單據＋品項兩層結構（破壞性變更）
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/04_expense_documents.sql` 的全部內容，執行
+3. **這會刪除舊的 `expenses` 表**，如果裡面有不想遺失的資料要先自己備份
+
+### 7. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
