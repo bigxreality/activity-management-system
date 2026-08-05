@@ -54,6 +54,16 @@
   .user-chip .role-tag{font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.05em;border:1px solid #333F4C;border-radius:4px;padding:1px 6px;color:#AEB8C2;}
   .gear-btn{background:transparent;border:1px solid #333F4C;color:#AEB8C2;border-radius:8px;padding:7px 12px;font-size:12.5px;display:flex;align-items:center;gap:6px;}
   .gear-btn:hover{border-color:var(--accent);color:#fff;}
+  .gear-btn.active{border-color:var(--accent);color:#fff;}
+  .sub-tabs{border-left:1px solid #333F4C;padding-left:12px;}
+  .sub-tabs button{padding:10px 12px;font-size:12.5px;}
+  .portal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:20px;}
+  .portal-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px;text-align:left;cursor:pointer;transition:border-color .15s ease, box-shadow .15s ease;}
+  .portal-card:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.06);}
+  .portal-card .icon{font-size:26px;}
+  .portal-card h3{font-family:var(--font-display);font-size:16px;margin:10px 0 4px;}
+  .portal-card p{color:var(--ink-faint);font-size:12.5px;margin:0;}
+  @media (max-width:700px){ .portal-grid{grid-template-columns:1fr;} }
   .status-dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:none;}
   .status-dot.ok{background:#3FBF8F;}
   .status-dot.err{background:var(--accent);}
@@ -223,13 +233,16 @@
     <span class="sub">Exhibition Expense Tracker</span>
   </div>
   <div class="topbar-right">
-    <nav class="tabs" role="tablist">
-      <button data-view="dashboard" class="active">儀表板</button>
-      <button data-view="expenses">費用明細</button>
-      <button data-view="exhibitions">展覽總覽</button>
-      <button data-view="contacts">客戶名單</button>
-      <button data-view="users" id="usersTabBtn" style="display:none;">使用者管理</button>
+    <nav class="tabs" role="tablist" id="portalNav">
+      <button data-portal="home" class="active">🏠 總覽</button>
+      <button data-portal="expense">💰 費用管理</button>
+      <button data-portal="crm">👥 客戶名單 CRM</button>
     </nav>
+    <nav class="tabs sub-tabs" role="tablist" id="expenseSubNav" style="display:none;">
+      <button data-view="expenses" class="active">費用明細</button>
+      <button data-view="exhibitions">展覽總覽</button>
+    </nav>
+    <button class="gear-btn" id="usersTabBtn" style="display:none;">使用者管理</button>
     <span class="user-chip"><span class="status-dot ok"></span><span id="userNameLabel"></span><span class="role-tag" id="userRoleLabel"></span></span>
     <button class="gear-btn" id="logoutBtn">登出</button>
   </div>
@@ -242,8 +255,27 @@
   <!-- ============ DASHBOARD ============ -->
   <section id="view-dashboard" class="view active">
     <h2 class="view-title">儀表板</h2>
-    <p class="view-desc">所有展覽的預算與實際支出總覽，資料存在 Supabase，所有登入的人共用同一份。</p>
+    <p class="view-desc">費用管理與客戶名單 CRM 的合併總覽，資料存在 Supabase，所有登入的人共用同一份。</p>
+
+    <div class="portal-grid">
+      <div class="portal-card" data-enter-portal="expense">
+        <div class="icon">💰</div>
+        <h3>費用管理</h3>
+        <p>費用明細、展覽總覽、預算執行率</p>
+      </div>
+      <div class="portal-card" data-enter-portal="crm">
+        <div class="icon">👥</div>
+        <h3>客戶名單 CRM</h3>
+        <p>公司與聯絡人、聯繫紀錄、待辦事項</p>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--font-display);font-size:14.5px;margin:26px 0 0;">費用概況</h3>
     <div class="stat-grid" id="statGrid"></div>
+
+    <h3 style="font-family:var(--font-display);font-size:14.5px;margin:22px 0 0;">CRM 概況</h3>
+    <div class="stat-grid" id="crmStatGrid"></div>
+
     <div class="chart-grid">
       <div class="card card-pad chart-card">
         <h3>各展覽：預算 vs 支出</h3>
@@ -880,17 +912,40 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     return !!currentUser && currentUser.role !== 'viewer';
   }
 
-  // ---------------- Tabs ----------------
-  document.querySelectorAll('nav.tabs button').forEach(function(btn){
+  // ---------------- Tabs／入口（費用管理、客戶名單 CRM 分開的入口，儀表板合併顯示兩邊資料） ----------------
+  var PORTAL_DEFAULT_VIEW = { home: 'dashboard', expense: 'expenses', crm: 'contacts', users: 'users' };
+
+  function activateView(viewName){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+    document.getElementById('view-' + viewName).classList.add('active');
+    if(viewName === 'dashboard') renderDashboard();
+    if(viewName === 'users') renderUsersTable();
+    if(viewName === 'contacts'){ renderContactsTable(); renderWeightsTable(); renderProductsTable(); renderCompaniesTable(); }
+  }
+
+  function activatePortal(portal){
+    document.querySelectorAll('#portalNav button').forEach(function(b){ b.classList.toggle('active', b.dataset.portal === portal); });
+    document.getElementById('usersTabBtn').classList.toggle('active', portal === 'users');
+    document.getElementById('expenseSubNav').style.display = (portal === 'expense') ? '' : 'none';
+    if(portal === 'expense'){
+      document.querySelectorAll('#expenseSubNav button').forEach(function(b){ b.classList.toggle('active', b.dataset.view === 'expenses'); });
+    }
+    activateView(PORTAL_DEFAULT_VIEW[portal]);
+  }
+
+  document.querySelectorAll('#portalNav button').forEach(function(btn){
+    btn.addEventListener('click', function(){ activatePortal(btn.dataset.portal); });
+  });
+  document.getElementById('usersTabBtn').addEventListener('click', function(){ activatePortal('users'); });
+  document.querySelectorAll('#expenseSubNav button').forEach(function(btn){
     btn.addEventListener('click', function(){
-      document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.remove('active'); });
-      document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+      document.querySelectorAll('#expenseSubNav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      document.getElementById('view-' + btn.dataset.view).classList.add('active');
-      if(btn.dataset.view === 'dashboard') renderDashboard();
-      if(btn.dataset.view === 'users') renderUsersTable();
-      if(btn.dataset.view === 'contacts'){ renderContactsTable(); renderWeightsTable(); renderProductsTable(); renderCompaniesTable(); }
+      activateView(btn.dataset.view);
     });
+  });
+  document.querySelectorAll('[data-enter-portal]').forEach(function(card){
+    card.addEventListener('click', function(){ activatePortal(card.dataset.enterPortal); });
   });
 
   function debounce(fn, wait){
@@ -2638,6 +2693,23 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       '<div class="stat"><div class="stat-label">總差異</div><div class="stat-value ' + (diff<0?'negative':'positive') + '">' + (diff<0?'−':'+') + 'NT$ ' + fmtInt(Math.abs(diff)) + '</div></div>';
   }
 
+  function renderCrmStatCards(){
+    var grid = document.getElementById('crmStatGrid');
+    var totalContacts = state.contacts.length;
+    var dealtCount = state.contacts.filter(function(c){ return c.status === '已成交'; }).length;
+    var thisMonth = new Date().toISOString().slice(0,7);
+    var newThisMonth = state.contacts.filter(function(c){ return (c.created_at||'').slice(0,7) === thisMonth; }).length;
+    var openTasks = 0;
+    state.contacts.forEach(function(c){
+      (c.tasks||[]).forEach(function(t){ if(t.status !== '已完成') openTasks++; });
+    });
+    grid.innerHTML =
+      '<div class="stat"><div class="stat-label">聯絡人總數</div><div class="stat-value">' + totalContacts + '<span class="stat-unit">位</span></div></div>' +
+      '<div class="stat"><div class="stat-label">本月新增聯絡人</div><div class="stat-value">' + newThisMonth + '<span class="stat-unit">位</span></div></div>' +
+      '<div class="stat"><div class="stat-label">已成交</div><div class="stat-value">' + dealtCount + '<span class="stat-unit">位</span></div></div>' +
+      '<div class="stat"><div class="stat-label">待處理待辦事項</div><div class="stat-value">' + openTasks + '<span class="stat-unit">筆</span></div></div>';
+  }
+
   function renderCharts(){
     var budgetCanvas = document.getElementById('chartBudget');
     var categoryCanvas = document.getElementById('chartCategory');
@@ -2710,6 +2782,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
 
   function renderDashboard(){
     renderStatCards();
+    renderCrmStatCards();
     renderCharts();
     renderDashExhibitionTable();
   }
