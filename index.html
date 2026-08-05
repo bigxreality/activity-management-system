@@ -777,7 +777,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var user = sessionRes.data.session && sessionRes.data.session.user;
     if(!user){ showAuthScreen(); return; }
 
-    var profRes = await supabase.from('profiles').select('id,email,name,role').eq('id', user.id).maybeSingle();
+    var profRes = await supabase.from('profiles').select('id,email,name,role,department,title').eq('id', user.id).maybeSingle();
     if(profRes.error || !profRes.data){
       document.getElementById('loginMsg').textContent = '找不到您的使用者權限資料，請聯絡管理員確認帳號設定';
       await supabase.auth.signOut();
@@ -946,7 +946,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         .select('*, exhibition:exhibitions!exhibition_id(id,name), applicant:profiles!applicant_id(id,name), payee:payees!payee_id(*), items:expense_items(*)')
         .order('date', { ascending:false });
       if(docRes.error) throw docRes.error;
-      var profRes = await supabase.from('profiles').select('id,email,name,role').order('name');
+      var profRes = await supabase.from('profiles').select('id,email,name,role,department,title').order('name');
       if(profRes.error) throw profRes.error;
       var payeeRes = await supabase.from('payees').select('*').order('name');
       if(payeeRes.error) throw payeeRes.error;
@@ -2291,7 +2291,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   // ---------------- 使用者管理（僅管理員） ----------------
-  // 新建/刪除 Supabase Auth 帳號要在 Supabase 後台操作，這裡只能改 profiles.role，
+  // 新建/刪除 Supabase Auth 帳號要在 Supabase 後台操作，這裡可以改姓名/部門/職稱/角色，
   // 真正擋住非 admin 寫入的是 profiles 表的 RLS 規則，這裡的畫面本來就只有 admin 看得到。
   var ROLE_OPTIONS = ['admin', 'editor', 'viewer'];
 
@@ -2302,47 +2302,55 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       wrap.innerHTML = '<div class="empty-state"><div class="big">👤</div>尚無使用者資料。</div>';
       return;
     }
-    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>姓名</th><th>角色</th><th></th></tr></thead><tbody>';
+    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>姓名</th><th>部門</th><th>職稱</th><th>角色</th><th></th></tr></thead><tbody>';
     state.profiles.forEach(function(u){
-      html += '<tr>' +
+      html += '<tr data-user-row="' + u.id + '">' +
         '<td class="mono">' + escapeHtml(u.email) + '</td>' +
-        '<td>' + escapeHtml(u.name) + '</td>' +
-        '<td><select data-role-select="' + u.id + '">' +
+        '<td><input type="text" class="u-name" value="' + escapeHtml(u.name||'') + '" style="width:110px;"></td>' +
+        '<td><input type="text" class="u-department" value="' + escapeHtml(u.department||'') + '" style="width:90px;"></td>' +
+        '<td><input type="text" class="u-title" value="' + escapeHtml(u.title||'') + '" style="width:90px;"></td>' +
+        '<td><select class="u-role">' +
           ROLE_OPTIONS.map(function(r){ return '<option value="' + r + '"' + (r === u.role ? ' selected' : '') + '>' + roleLabel(r) + '</option>'; }).join('') +
         '</select></td>' +
-        '<td><button class="btn btn-ghost btn-sm" data-save-role="' + u.id + '">儲存</button></td>' +
+        '<td><button class="btn btn-ghost btn-sm" data-save-user="' + u.id + '">儲存</button></td>' +
       '</tr>';
     });
     html += '</tbody></table></div>';
     wrap.innerHTML = html;
-    wrap.querySelectorAll('[data-save-role]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var id = btn.dataset.saveRole;
-        var sel = wrap.querySelector('[data-role-select="' + id + '"]');
-        updateUserRole(id, sel.value, sel, btn);
-      });
+    wrap.querySelectorAll('[data-save-user]').forEach(function(btn){
+      btn.addEventListener('click', function(){ saveUserProfile(btn.dataset.saveUser, btn); });
     });
   }
 
-  async function updateUserRole(id, newRole, selectEl, saveBtn){
+  async function saveUserProfile(id, saveBtn){
     var target = state.profiles.find(function(u){ return u.id === id; });
     if(!target) return;
+    var row = saveBtn.closest('tr');
+    var name = row.querySelector('.u-name').value.trim();
+    var department = row.querySelector('.u-department').value.trim();
+    var title = row.querySelector('.u-title').value.trim();
+    var newRole = row.querySelector('.u-role').value;
+    if(!name){ toast('姓名不能空白'); return; }
     if(target.role === 'admin' && newRole !== 'admin'){
       var otherAdmins = state.profiles.filter(function(u){ return u.role === 'admin' && u.id !== id; }).length;
       if(otherAdmins === 0){
         toast('至少要保留一位管理員，無法把最後一位管理員改成其他角色');
-        selectEl.value = target.role;
+        row.querySelector('.u-role').value = target.role;
         return;
       }
     }
     saveBtn.disabled = true;
     showLoading(true);
     try{
-      var res = await supabase.from('profiles').update({ role: newRole }).eq('id', id);
+      var res = await supabase.from('profiles').update({
+        name: name, department: department || null, title: title || null, role: newRole
+      }).eq('id', id);
       if(res.error) throw res.error;
-      toast('已更新角色');
+      toast('已更新使用者資料');
       if(currentUser.id === id){
         currentUser.role = newRole;
+        currentUser.name = name;
+        document.getElementById('userNameLabel').textContent = name;
         document.getElementById('userRoleLabel').textContent = roleLabel(newRole);
       }
       await loadState();
