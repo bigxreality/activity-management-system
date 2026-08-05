@@ -1,6 +1,10 @@
 // App shell 快取：讓已經打開過的人斷網時至少能開啟介面。
 // 不快取 Supabase API 呼叫——資料要即時，斷網時本來就無法讀寫，這裡只保證畫面能開。
-var CACHE_NAME = 'activity-mgmt-shell-v1';
+//
+// 快取策略是「網路優先，斷網才用快取」（network-first），不是「快取優先」：
+// 這是持續在改版的內部工具，使用者應該要一打開就看到最新版本，快取只是離線時的
+// 保底，不應該讓大家卡在舊版本、還要手動清快取才看得到更新。
+var CACHE_NAME = 'activity-mgmt-shell-v2';
 var APP_SHELL = [
   './',
   './index.html',
@@ -32,15 +36,14 @@ self.addEventListener('fetch', function (event) {
   if (url.origin !== self.location.origin) return; // 跨網域（Supabase、CDN）一律不經過快取層，直接走網路
 
   event.respondWith(
-    caches.match(req).then(function (cached) {
-      var networkFetch = fetch(req).then(function (res) {
-        if (res && res.ok) {
-          var clone = res.clone();
-          caches.open(CACHE_NAME).then(function (cache) { cache.put(req, clone); });
-        }
-        return res;
-      }).catch(function () { return cached; });
-      return cached || networkFetch;
+    fetch(req).then(function (res) {
+      if (res && res.ok) {
+        var clone = res.clone();
+        caches.open(CACHE_NAME).then(function (cache) { cache.put(req, clone); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(req); // 只有網路真的打不通（離線）才退回快取
     })
   );
 });
