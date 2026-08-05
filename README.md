@@ -15,7 +15,11 @@
 - ✅ 費用明細改成「單據（一張發票/收據）+ 品項（可多筆）」兩層結構，含付款對象主檔
 - ✅ CRM 模組重新設計（公司／聯絡人取代名單、聯絡方式、參展紀錄、聯繫紀錄、待辦事項、
   產品管理、多語系欄位＋RTL 文字方向偵測）
-- ⏳ 名片 AI 掃描辨識、離線掃描佇列、重複聯絡人偵測、客戶自填表單、草稿暫存 — 下一階段
+- ✅ 儀表板改成合併總覽（費用＋CRM 統計都在同一頁），費用管理／客戶名單 CRM 拆成
+  兩個入口，使用者管理維持獨立可隨時進入
+- ✅ 名片 AI 掃描辨識（用 Google Gemini，拍照/上傳名片後自動預填聯絡人表單，
+  同一張名片重複掃描會沿用上次結果、不重複計費）
+- ⏳ 離線掃描佇列、重複聯絡人偵測、客戶自填表單、草稿暫存 — 下一階段
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
 
@@ -50,6 +54,9 @@
   上實際畫面），會先刪除舊的 `leads`／`contact_logs` 表（含裡面的資料）再重建。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
+- `supabase/functions/card-ocr/` — 名片辨識的 Supabase Edge Function，前端把名片
+  照片轉成 base64 傳進來，這裡呼叫 Google Gemini（多模態）辨識成結構化 JSON 再
+  回傳，只有 admin/editor 能呼叫（會產生 Gemini API 費用，不開放 viewer）。
 
 ## 部署步驟（第一次設定）
 
@@ -124,7 +131,24 @@ supabase functions deploy bot-rate
 3. **這會刪除舊的 `leads`、`contact_logs` 表**，如果裡面有不想遺失的資料要先自己備份
    （這兩張表是這幾天才剛做出來的測試功能，資料結構跟新版完全不同，無法自動轉換）
 
-### 11. 部署 GitHub Pages
+### 11. 部署名片辨識的 Edge Function（需要 Google Gemini API 金鑰）
+
+1. 到 [Google AI Studio](https://aistudio.google.com/apikey) 申請一組 Gemini API
+   金鑰（免費額度就能用，量大才會收費）
+2. 部署這支 Edge Function，有兩種做法都可以：
+   - **用 CLI**（跟第 4 步一樣要先裝好 Supabase CLI）：
+     ```bash
+     supabase functions deploy card-ocr
+     supabase secrets set GEMINI_API_KEY=你的金鑰
+     ```
+   - **不裝 CLI，直接在網頁後台操作**：Supabase 後台左側「Edge Functions」→
+     「Create a new function」，名稱填 `card-ocr`，把 `supabase/functions/card-ocr/index.ts`
+     的內容貼進去部署；接著到這支函式的「Secrets」分頁新增一筆
+     `GEMINI_API_KEY`，值填你申請到的金鑰
+3. 這支函式只有 admin/editor 能呼叫，而且每次辨識都會呼叫 Gemini API 產生費用
+   （同一張名片重複掃描會直接沿用上次的辨識結果，不會重複呼叫）
+
+### 12. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」

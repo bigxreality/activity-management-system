@@ -561,6 +561,20 @@
       </div>
     </details>
 
+    <details class="card card-pad form-card" id="cardScanCard">
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">📇 名片辨識（AI 自動預填下方表單）</summary>
+      <p class="hint" style="margin:8px 0 0;color:var(--ink-faint);font-size:12px;">拍照或選擇名片圖片，AI 辨識後會自動帶入下方「新增聯絡人」表單，請務必檢查/修正後再儲存。每次辨識都會呼叫 AI 服務，產生一點點費用，同一張名片重複掃描會直接沿用上次的辨識結果、不會重複計費。</p>
+      <input type="file" id="cardScanCameraInput" accept="image/*" capture="environment" style="display:none;">
+      <input type="file" id="cardScanFilesInput" accept="image/*" style="display:none;">
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button type="button" class="btn btn-ghost btn-sm" id="cardScanCameraBtn">📷 拍名片</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="cardScanFilesBtn">📁 選擇檔案</button>
+        <button type="button" class="btn btn-primary btn-sm" id="cardScanRunBtn" disabled>辨識名片</button>
+      </div>
+      <div id="cardScanPreview" style="margin-top:10px;"></div>
+      <div id="cardScanStatus" style="margin-top:8px;font-size:12.5px;color:var(--ink-faint);"></div>
+    </details>
+
     <details class="card card-pad form-card" id="contactFormCard" open>
       <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">新增聯絡人</summary>
       <form id="contactForm">
@@ -746,6 +760,7 @@ const SUPABASE_URL = 'https://jmuuoteyzjzrotovbhuu.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_5QLSNFrt4qTF0MIncq_e4g_dWMFQTX-';
 const IS_CONFIGURED = !!SUPABASE_URL && !!SUPABASE_ANON_KEY && !SUPABASE_URL.includes('YOUR_SUPABASE');
 const RATE_FUNCTION_URL = IS_CONFIGURED ? SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/bot-rate' : '';
+const CARD_OCR_FUNCTION_URL = IS_CONFIGURED ? SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/card-ocr' : '';
 
 const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
@@ -813,6 +828,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   var photoState = {
     avatar: { pendingFile: null, existingPath: null, removed: false }
   };
+  var cardScanState = { pendingFile: null, hash: null, businessCardId: null };
 
   function fmtInt(n){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits:0}).format(Math.round(n||0)); }
   function fmtNum(n, dp){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits: dp==null?2:dp}).format(n||0); }
@@ -904,6 +920,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('usersTabBtn').style.display = isAdmin ? '' : 'none';
     document.getElementById('contactFormCard').style.display = isViewer ? 'none' : '';
     document.getElementById('companyFormCard').style.display = isViewer ? 'none' : '';
+    document.getElementById('cardScanCard').style.display = isViewer ? 'none' : '';
     document.getElementById('weightsFormCard').style.display = isAdmin ? '' : 'none';
     document.getElementById('productsFormCard').style.display = isAdmin ? '' : 'none';
   }
@@ -2012,6 +2029,152 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
   document.getElementById('addContactMethodRowBtn').addEventListener('click', function(){ addContactMethodRow(); });
 
+  // ---------------- CRM：名片辨識（AI 自動預填聯絡人表單） ----------------
+  function fileToBase64(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(String(reader.result).split(',')[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  async function sha256Hex(arrayBuffer){
+    var hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    var hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  function renderCardScanPreview(){
+    var wrap = document.getElementById('cardScanPreview');
+    if(!cardScanState.pendingFile){ wrap.innerHTML = ''; return; }
+    var url = URL.createObjectURL(cardScanState.pendingFile);
+    wrap.innerHTML = '<div class="attach-preview-item"><img src="' + url + '" style="width:64px;height:44px;object-fit:cover;border-radius:6px;">' + escapeHtml(cardScanState.pendingFile.name) + '</div>';
+  }
+
+  document.getElementById('cardScanCameraBtn').addEventListener('click', function(){ document.getElementById('cardScanCameraInput').click(); });
+  document.getElementById('cardScanFilesBtn').addEventListener('click', function(){ document.getElementById('cardScanFilesInput').click(); });
+
+  async function handleCardScanFileChange(ev){
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if(!file) return;
+    var statusEl = document.getElementById('cardScanStatus');
+    statusEl.textContent = '處理圖片中...';
+    var converted = await convertImageToWebp(file);
+    var buf = await converted.arrayBuffer();
+    var hash = await sha256Hex(buf);
+    cardScanState.pendingFile = converted;
+    cardScanState.hash = hash;
+    cardScanState.businessCardId = null;
+    renderCardScanPreview();
+    document.getElementById('cardScanRunBtn').disabled = false;
+    statusEl.textContent = '已選好圖片，按「辨識名片」開始辨識';
+  }
+  document.getElementById('cardScanCameraInput').addEventListener('change', handleCardScanFileChange);
+  document.getElementById('cardScanFilesInput').addEventListener('change', handleCardScanFileChange);
+
+  function fillContactFormFromCardScan(result){
+    if(!result) return;
+    document.getElementById('contactFormCard').open = true;
+    document.getElementById('c_name_original').value = result.name_original || '';
+    document.getElementById('c_name_english').value = result.name_english || '';
+    document.getElementById('c_department_original').value = result.department_original || '';
+    document.getElementById('c_department_english').value = result.department_english || '';
+    document.getElementById('c_title_original').value = result.title_original || '';
+    document.getElementById('c_title_english').value = result.title_english || '';
+    document.getElementById('c_country').value = result.country || '';
+    document.getElementById('c_address_original').value = result.address_original || '';
+    document.getElementById('c_address_english').value = result.address_english || '';
+
+    var companyNameOriginal = (result.company_name_original || '').trim();
+    var companyNameEnglish = (result.company_name_english || '').trim();
+    var matchedCompany = null;
+    if(companyNameOriginal || companyNameEnglish){
+      matchedCompany = state.companies.find(function(co){
+        return (companyNameOriginal && co.name_original && co.name_original.trim() === companyNameOriginal) ||
+          (companyNameEnglish && co.name_english && co.name_english.trim() === companyNameEnglish);
+      });
+    }
+    if(matchedCompany){
+      document.getElementById('c_company').value = matchedCompany.id;
+    } else if(companyNameOriginal || companyNameEnglish){
+      document.getElementById('c_company').value = '';
+      toast('名片上的公司「' + (companyNameOriginal || companyNameEnglish) + '」在系統裡找不到，可以先去上面「公司管理」新增');
+    }
+
+    clearContactMethodRows();
+    var methods = result.contact_methods || [];
+    if(methods.length === 0){ addContactMethodRow(); }
+    else{ methods.forEach(function(m){ addContactMethodRow({ type: m.type || 'other', value_original: m.value || '', is_primary: false }); }); }
+
+    document.querySelectorAll('#contactForm .rtl-aware').forEach(applyRtlAwareness);
+    document.getElementById('contactFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  document.getElementById('cardScanRunBtn').addEventListener('click', runCardScan);
+  async function runCardScan(){
+    var statusEl = document.getElementById('cardScanStatus');
+    if(!cardScanState.pendingFile || !cardScanState.hash){ statusEl.textContent = '請先選擇名片圖片'; return; }
+    var runBtn = document.getElementById('cardScanRunBtn');
+    runBtn.disabled = true;
+    statusEl.textContent = '檢查是否掃描過...';
+    try{
+      var existingRes = await supabase.from('business_cards').select('*').eq('image_hash', cardScanState.hash).maybeSingle();
+      if(existingRes.error) throw existingRes.error;
+      if(existingRes.data && existingRes.data.recognition_json){
+        cardScanState.businessCardId = existingRes.data.id;
+        fillContactFormFromCardScan(existingRes.data.recognition_json);
+        statusEl.textContent = '這張名片之前掃描過，直接沿用上次的辨識結果（沒有重新呼叫 AI，不會重複計費）';
+        return;
+      }
+
+      statusEl.textContent = '上傳圖片中...';
+      var path = 'business_cards/' + cardScanState.hash + '.webp';
+      var uploadRes = await supabase.storage.from('photos').upload(path, cardScanState.pendingFile, { upsert: true });
+      if(uploadRes.error) throw new Error('名片圖片上傳失敗：' + uploadRes.error.message);
+
+      statusEl.textContent = 'AI 辨識中，請稍候...';
+      var base64 = await fileToBase64(cardScanState.pendingFile);
+      var sessionRes = await supabase.auth.getSession();
+      var token = (sessionRes.data.session && sessionRes.data.session.access_token) || SUPABASE_ANON_KEY;
+      var ocrRes = await fetch(CARD_OCR_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, apikey: SUPABASE_ANON_KEY },
+        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/webp' })
+      });
+      var ocrData = await ocrRes.json();
+      if(!ocrRes.ok || ocrData.error) throw new Error(ocrData.error || ('辨識服務回應錯誤 ' + ocrRes.status));
+
+      var insertRes = await supabase.from('business_cards').insert({
+        image_path: path,
+        image_hash: cardScanState.hash,
+        recognition_json: ocrData.result,
+        raw_ocr_text: ocrData.raw_text || null,
+        detected_languages: (ocrData.result && ocrData.result.detected_language) ? [ocrData.result.detected_language] : null,
+        ai_model: ocrData.ai_model || null,
+        recognition_status: 'done',
+        token_usage: ocrData.token_usage || null,
+        uploaded_by: currentUser.id
+      }).select().maybeSingle();
+      if(insertRes.error) throw insertRes.error;
+
+      cardScanState.businessCardId = insertRes.data ? insertRes.data.id : null;
+      fillContactFormFromCardScan(ocrData.result);
+      statusEl.textContent = '✅ 已帶入辨識結果，請檢查後再儲存';
+    }catch(err){
+      statusEl.textContent = '辨識失敗：' + err.message;
+    }finally{
+      runBtn.disabled = false;
+    }
+  }
+
+  function resetCardScanState(){
+    cardScanState = { pendingFile: null, hash: null, businessCardId: null };
+    document.getElementById('cardScanRunBtn').disabled = true;
+    document.getElementById('cardScanStatus').textContent = '';
+    renderCardScanPreview();
+  }
+
   // ---------------- CRM：產品管理（僅管理員） ----------------
   function renderProductsTable(){
     var wrap = document.getElementById('productsTableWrap');
@@ -2226,6 +2389,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('contactSubmitBtn').textContent = '新增聯絡人';
     document.getElementById('contactCancelBtn').style.display = 'none';
     document.getElementById('contactFormMsg').textContent = '';
+    resetCardScanState();
   }
   document.getElementById('contactCancelBtn').addEventListener('click', resetContactForm);
 
@@ -2292,6 +2456,10 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
           { onConflict: 'exhibition_id,contact_id' }
         );
         if(ecRes.error) throw ecRes.error;
+      }
+
+      if(cardScanState.businessCardId){
+        await supabase.from('business_cards').update({ contact_id: contactId }).eq('id', cardScanState.businessCardId);
       }
 
       toast(editingContactId ? '已更新聯絡人' : '已新增聯絡人');
