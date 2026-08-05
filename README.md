@@ -35,6 +35,9 @@
 - `supabase/sql/05_crm.sql` — CRM 模組：`leads`（名單）、`contact_logs`（聯繫紀錄）、
   `identity_weights`（身份權重設定，含初始資料）三張表、`leads_with_score` view，
   以及名片/頭像照片用的 `photos` Storage bucket（私有）。
+- `supabase/sql/06_item_level_tax_and_attachments.sql` — 品項欄位重構：附件改掛在
+  品項上（不是單據），稅額改成用稅率自動算（`amount × tax_rate ÷ 100` 的
+  generated column），移除單據層級的 `attachments` 欄位。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 
@@ -92,7 +95,14 @@ supabase functions deploy bot-rate
 3. 如果 `insert into storage.buckets` 那段權限跑不過，改成手動在「Storage」頁面
    建立名為 `photos` 的私有 bucket（做法同附件 bucket）
 
-### 8. 部署 GitHub Pages
+### 8. 品項欄位重構（附件改掛在品項上、稅額改用稅率算）
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/06_item_level_tax_and_attachments.sql` 的全部內容，執行
+3. 如果之前有測試品項填過稅額，這次執行後稅額會變成用稅率重新算，之前手動填的
+   稅額數字會不見（稅率預設 0）
+
+### 9. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
