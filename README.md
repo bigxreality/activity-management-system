@@ -38,6 +38,8 @@
 - `supabase/sql/06_item_level_tax_and_attachments.sql` — 品項欄位重構：附件改掛在
   品項上（不是單據），稅額改成用稅率自動算（`amount × tax_rate ÷ 100` 的
   generated column），移除單據層級的 `attachments` 欄位。
+- `supabase/sql/07_profiles_department_title.sql` — `profiles` 表新增部門、職稱
+  欄位，管理員可以在「使用者管理」畫面直接編輯。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 
@@ -102,7 +104,12 @@ supabase functions deploy bot-rate
 3. 如果之前有測試品項填過稅額，這次執行後稅額會變成用稅率重新算，之前手動填的
    稅額數字會不見（稅率預設 0）
 
-### 9. 部署 GitHub Pages
+### 9. 使用者權限加部門/職稱
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/07_profiles_department_title.sql` 的全部內容，執行
+
+### 10. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
