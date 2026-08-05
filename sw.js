@@ -4,7 +4,7 @@
 // 快取策略是「網路優先，斷網才用快取」（network-first），不是「快取優先」：
 // 這是持續在改版的內部工具，使用者應該要一打開就看到最新版本，快取只是離線時的
 // 保底，不應該讓大家卡在舊版本、還要手動清快取才看得到更新。
-var CACHE_NAME = 'activity-mgmt-shell-v2';
+var CACHE_NAME = 'activity-mgmt-shell-v3';
 var APP_SHELL = [
   './',
   './index.html',
@@ -35,8 +35,14 @@ self.addEventListener('fetch', function (event) {
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // 跨網域（Supabase、CDN）一律不經過快取層，直接走網路
 
+  // cache: 'no-store'：繞過瀏覽器自己的 HTTP 快取，強制真的問一次伺服器，
+  // 不然就算這裡邏輯是 network-first，fetch() 還是可能被瀏覽器 HTTP 快取
+  // 擋下來、直接回傳舊回應，等於白做——這是上一版只改 Service Worker
+  // 邏輯、沒堵到的另一層快取。
+  var freshReq = new Request(req, { cache: 'no-store' });
+
   event.respondWith(
-    fetch(req).then(function (res) {
+    fetch(freshReq).then(function (res) {
       if (res && res.ok) {
         var clone = res.clone();
         caches.open(CACHE_NAME).then(function (cache) { cache.put(req, clone); });
