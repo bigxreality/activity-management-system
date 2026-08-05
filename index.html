@@ -404,10 +404,11 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 // ---------------- Supabase 連線設定 ----------------
-// 這是公開的 anon key，配合 Row Level Security 使用是安全的設計，可以放在前端程式碼裡。
-// 絕對不要把 service role key 放在這裡或 commit 進 repo。
-const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+// 這是公開的 publishable key（新版 Supabase API key 命名，等同以前的 anon key），
+// 配合 Row Level Security 使用是安全的設計，可以放在前端程式碼裡。
+// 絕對不要把 secret key（sb_secret_... 開頭，等同以前的 service role key）放在這裡或 commit 進 repo。
+const SUPABASE_URL = 'https://jmuuoteyzjzrotovbhuu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_5QLSNFrt4qTF0MIncq_e4g_dWMFQTX-';
 const IS_CONFIGURED = !!SUPABASE_URL && !!SUPABASE_ANON_KEY && !SUPABASE_URL.includes('YOUR_SUPABASE');
 const RATE_FUNCTION_URL = IS_CONFIGURED ? SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/bot-rate' : '';
 
