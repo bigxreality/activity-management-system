@@ -544,15 +544,50 @@
     </details>
 
     <details class="card card-pad form-card" id="companyFormCard">
-      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">公司管理</summary>
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">公司管理（客戶／供應商／媒體人脈）</summary>
+      <div class="toolbar" style="margin-top:12px;">
+        <div class="toolbar-left" style="flex-wrap:wrap;">
+          <input type="text" id="companySearchInput" placeholder="搜尋公司名稱" style="border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 10px;font-size:13px;">
+          <select id="companyFilterType">
+            <option value="">全部類型</option>
+            <option value="客戶">客戶</option>
+            <option value="供應商">供應商</option>
+            <option value="媒體">媒體</option>
+            <option value="合作夥伴">合作夥伴</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
       <div id="companiesTableWrap" style="margin-top:12px;"></div>
       <div class="form-grid" style="margin-top:12px;">
+        <div class="field">
+          <label>類型 <span class="req">*</span></label>
+          <select id="co_company_type">
+            <option value="客戶">客戶</option>
+            <option value="供應商">供應商</option>
+            <option value="媒體">媒體</option>
+            <option value="合作夥伴">合作夥伴</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>產業／類別</label>
+          <input type="text" id="co_industry" list="industryOptions" placeholder="可自訂輸入">
+          <datalist id="industryOptions">
+            <option value="禮贈品"><option value="印刷"><option value="展場設計"><option value="攤位搭建">
+            <option value="運輸物流"><option value="設備租借"><option value="影音製作"><option value="翻譯服務">
+            <option value="人力派遣"><option value="電視台"><option value="報社"><option value="雜誌">
+            <option value="網路媒體"><option value="公關公司"><option value="政府單位"><option value="軍警單位">
+            <option value="系統整合商"><option value="代理經銷"><option value="其他">
+          </datalist>
+        </div>
         <div class="field"><label>公司名稱（原文）</label><input type="text" id="co_name_original" class="rtl-aware"></div>
         <div class="field"><label>公司名稱（英文）</label><input type="text" id="co_name_english"></div>
         <div class="field"><label>網站</label><input type="text" id="co_website" placeholder="https://..."></div>
         <div class="field"><label>國家</label><input type="text" id="co_country"></div>
         <div class="field span-2"><label>地址（原文）</label><input type="text" id="co_address_original" class="rtl-aware"></div>
         <div class="field span-2"><label>地址（英文）</label><input type="text" id="co_address_english"></div>
+        <div class="field span-2"><label>備註</label><input type="text" id="co_note" placeholder="選填"></div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-primary btn-sm" id="saveCompanyBtn">新增公司</button>
@@ -629,6 +664,10 @@
           <div class="field">
             <label>職稱（英文）</label>
             <input type="text" id="c_title_english">
+          </div>
+          <div class="field span-2">
+            <label>負責項目／功能</label>
+            <input type="text" id="c_responsibility" placeholder="例如：負責禮贈品報價、跑國防線記者、採購決策者">
           </div>
           <div class="field">
             <label>國家</label>
@@ -712,6 +751,14 @@
         <div class="toolbar">
           <div class="toolbar-left" style="flex-wrap:wrap;">
             <input type="text" id="contactSearchInput" placeholder="搜尋姓名/公司/Email/電話" style="border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 10px;font-size:13px;">
+            <select id="contactFilterCompanyType">
+              <option value="">全部公司類型</option>
+              <option value="客戶">客戶</option>
+              <option value="供應商">供應商</option>
+              <option value="媒體">媒體</option>
+              <option value="合作夥伴">合作夥伴</option>
+              <option value="其他">其他</option>
+            </select>
             <select id="contactFilterExhibition"><option value="">全部展覽</option></select>
             <select id="contactFilterOwner"><option value="">全部負責業務</option></select>
             <select id="contactFilterImportance">
@@ -821,6 +868,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   var editingContactId = null;
   var editingCompanyId = null;
   var expandedContactIds = {};
+  var expandedCompanyIds = {};
   var CONTACT_STATUSES = ["新名單","追蹤中","已報價","已成交","已流失"];
   var CONTACT_METHOD_TYPES = ['email','mobile','office_phone','fax','website','LINE','WhatsApp','WeChat','LinkedIn','other'];
   var CONTACT_METHOD_LABELS = { email:'Email', mobile:'手機', office_phone:'公司電話', fax:'傳真', website:'網站', LINE:'LINE', WhatsApp:'WhatsApp', WeChat:'WeChat', LinkedIn:'LinkedIn', other:'其他' };
@@ -2073,7 +2121,42 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   document.getElementById('cardScanCameraInput').addEventListener('change', handleCardScanFileChange);
   document.getElementById('cardScanFilesInput').addEventListener('change', handleCardScanFileChange);
 
-  function fillContactFormFromCardScan(result){
+  // 名片上的公司：先找系統裡有沒有同名的，沒有就自動建一筆，這樣同一家公司的
+  // 成員掃進來會自動歸在同一間公司底下，不用每次手動先去「公司管理」新增。
+  // 比對時忽略大小寫與前後空白，避免同一家公司被建成好幾筆。
+  async function resolveCompanyFromCardScan(result){
+    var nameOriginal = (result.company_name_original || '').trim();
+    var nameEnglish = (result.company_name_english || '').trim();
+    if(!nameOriginal && !nameEnglish) return null;
+
+    function norm(s){ return (s || '').trim().toLowerCase(); }
+    var matched = state.companies.find(function(co){
+      return (nameOriginal && norm(co.name_original) === norm(nameOriginal)) ||
+        (nameEnglish && norm(co.name_english) === norm(nameEnglish));
+    });
+    if(matched) return matched;
+
+    var insertRes = await supabase.from('companies').insert({
+      company_type: '客戶',
+      name_original: nameOriginal || null,
+      name_english: nameEnglish || null,
+      country: result.country || null,
+      address_original: result.address_original || null,
+      address_english: result.address_english || null
+    }).select().maybeSingle();
+    if(insertRes.error){
+      toast('自動建立公司失敗：' + insertRes.error.message);
+      return null;
+    }
+    if(insertRes.data){
+      state.companies.push(insertRes.data);
+      refreshContactFormSelects();
+      toast('已自動建立公司「' + (nameOriginal || nameEnglish) + '」');
+    }
+    return insertRes.data;
+  }
+
+  async function fillContactFormFromCardScan(result){
     if(!result) return;
     document.getElementById('contactFormCard').open = true;
     document.getElementById('c_name_original').value = result.name_original || '';
@@ -2086,21 +2169,8 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('c_address_original').value = result.address_original || '';
     document.getElementById('c_address_english').value = result.address_english || '';
 
-    var companyNameOriginal = (result.company_name_original || '').trim();
-    var companyNameEnglish = (result.company_name_english || '').trim();
-    var matchedCompany = null;
-    if(companyNameOriginal || companyNameEnglish){
-      matchedCompany = state.companies.find(function(co){
-        return (companyNameOriginal && co.name_original && co.name_original.trim() === companyNameOriginal) ||
-          (companyNameEnglish && co.name_english && co.name_english.trim() === companyNameEnglish);
-      });
-    }
-    if(matchedCompany){
-      document.getElementById('c_company').value = matchedCompany.id;
-    } else if(companyNameOriginal || companyNameEnglish){
-      document.getElementById('c_company').value = '';
-      toast('名片上的公司「' + (companyNameOriginal || companyNameEnglish) + '」在系統裡找不到，可以先去上面「公司管理」新增');
-    }
+    var company = await resolveCompanyFromCardScan(result);
+    document.getElementById('c_company').value = company ? company.id : '';
 
     clearContactMethodRows();
     var methods = result.contact_methods || [];
@@ -2123,7 +2193,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(existingRes.error) throw existingRes.error;
       if(existingRes.data && existingRes.data.recognition_json){
         cardScanState.businessCardId = existingRes.data.id;
-        fillContactFormFromCardScan(existingRes.data.recognition_json);
+        await fillContactFormFromCardScan(existingRes.data.recognition_json);
         statusEl.textContent = '這張名片之前掃描過，直接沿用上次的辨識結果（沒有重新呼叫 AI，不會重複計費）';
         return;
       }
@@ -2159,7 +2229,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(insertRes.error) throw insertRes.error;
 
       cardScanState.businessCardId = insertRes.data ? insertRes.data.id : null;
-      fillContactFormFromCardScan(ocrData.result);
+      await fillContactFormFromCardScan(ocrData.result);
       statusEl.textContent = '✅ 已帶入辨識結果，請檢查後再儲存';
     }catch(err){
       statusEl.textContent = '辨識失敗：' + err.message;
@@ -2244,31 +2314,100 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   });
 
   // ---------------- CRM：公司管理 ----------------
+  function companyDisplayName(c){
+    if(!c) return '—';
+    var name = c.name_original || c.name_english || '（未命名）';
+    if(c.name_original && c.name_english && c.name_original !== c.name_english) name += '／' + c.name_english;
+    return name;
+  }
+  function contactsOfCompany(companyId){
+    return state.contacts.filter(function(ct){ return ct.company_id === companyId; });
+  }
+
   function renderCompaniesTable(){
     var wrap = document.getElementById('companiesTableWrap');
-    if(state.companies.length === 0){ wrap.innerHTML = '<div class="empty-state">尚無公司資料。</div>'; return; }
+    var search = document.getElementById('companySearchInput').value.trim().toLowerCase();
+    var filterType = document.getElementById('companyFilterType').value;
+    var rows = state.companies.filter(function(c){
+      if(filterType && (c.company_type || '客戶') !== filterType) return false;
+      if(search){
+        var haystack = [c.name_original, c.name_english, c.industry].join(' ').toLowerCase();
+        if(haystack.indexOf(search) < 0) return false;
+      }
+      return true;
+    });
+    if(rows.length === 0){ wrap.innerHTML = '<div class="empty-state">尚無符合條件的公司。</div>'; return; }
     var writable = canWrite();
-    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>公司名稱</th><th>網站</th><th>國家</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
-    state.companies.forEach(function(c){
-      var name = c.name_original || c.name_english || '（未命名）';
-      if(c.name_original && c.name_english) name += '／' + c.name_english;
-      html += '<tr><td>' + escapeHtml(name) + '</td>' +
-        '<td>' + (c.website ? '<a href="' + escapeHtml(c.website) + '" target="_blank" rel="noopener">' + escapeHtml(c.website) + '</a>' : '—') + '</td>' +
+    var colspan = writable ? 7 : 6;
+    var html = '<div style="overflow-x:auto;"><table><thead><tr><th></th><th>公司名稱</th><th>類型</th><th>產業／類別</th>' +
+      '<th class="num">成員</th><th>國家</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
+    rows.forEach(function(c){
+      var members = contactsOfCompany(c.id);
+      var expanded = !!expandedCompanyIds[c.id];
+      html += '<tr>' +
+        '<td><button type="button" class="icon-btn" data-toggle-company="' + c.id + '">' + (expanded ? '▾' : '▸') + '</button></td>' +
+        '<td style="font-weight:600;">' + escapeHtml(companyDisplayName(c)) +
+          (c.website ? ' <a href="' + escapeHtml(c.website) + '" target="_blank" rel="noopener" style="font-weight:400;font-size:11px;">🔗</a>' : '') + '</td>' +
+        '<td><span class="tag">' + escapeHtml(c.company_type || '客戶') + '</span></td>' +
+        '<td>' + escapeHtml(c.industry || '—') + '</td>' +
+        '<td class="num">' + members.length + '</td>' +
         '<td>' + escapeHtml(c.country || '—') + '</td>' +
         (writable ? ('<td><div class="row-actions">' +
           '<button class="icon-btn" data-co-edit="' + c.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-co-del="' + c.id + '">刪除</button>' +
         '</div></td>') : '') + '</tr>';
+      html += '<tr class="item-detail-row" data-company-detail="' + c.id + '" style="display:' + (expanded ? 'table-row' : 'none') + ';">' +
+        '<td colspan="' + colspan + '" style="background:var(--surface-alt);">' + renderCompanyMembers(c, members) + '</td></tr>';
     });
     html += '</tbody></table></div>';
+    html += '<div class="table-footer"><span>共 ' + rows.length + ' 間公司</span></div>';
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-co-edit]').forEach(function(b){ b.addEventListener('click', function(){ editCompany(b.dataset.coEdit); }); });
     wrap.querySelectorAll('[data-co-del]').forEach(function(b){ b.addEventListener('click', function(){ deleteCompany(b.dataset.coDel); }); });
+    wrap.querySelectorAll('[data-company-contact-edit]').forEach(function(b){
+      b.addEventListener('click', function(){ editContact(b.dataset.companyContactEdit); });
+    });
+    wrap.querySelectorAll('[data-toggle-company]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var id = b.dataset.toggleCompany;
+        var row = wrap.querySelector('[data-company-detail="' + id + '"]');
+        var showing = row.style.display !== 'none';
+        row.style.display = showing ? 'none' : 'table-row';
+        b.textContent = showing ? '▸' : '▾';
+        expandedCompanyIds[id] = !showing;
+      });
+    });
   }
+
+  // 同一家公司底下的人員清單：看得出每個人各自負責什麼
+  function renderCompanyMembers(company, members){
+    var head = '<div style="padding:12px 16px 4px 40px;"><strong>' + escapeHtml(companyDisplayName(company)) + ' 的人員清單</strong></div>';
+    if(members.length === 0){
+      return head + '<div style="padding:4px 16px 14px 40px;color:var(--ink-faint);font-size:12.5px;">這家公司底下還沒有聯絡人。</div>';
+    }
+    var writable = canWrite();
+    var rowsHtml = members.map(function(ct){
+      var title = ct.title_original || ct.title_english || '—';
+      var dept = ct.department_original || ct.department_english || '—';
+      return '<tr><td style="padding-left:40px;">' + escapeHtml(ct.name_original || ct.name_english || '—') + '</td>' +
+        '<td>' + escapeHtml(dept) + '</td>' +
+        '<td>' + escapeHtml(title) + '</td>' +
+        '<td>' + escapeHtml(ct.responsibility || '—') + '</td>' +
+        '<td><span class="tag">' + escapeHtml(ct.status) + '</span></td>' +
+        (writable ? '<td><button class="icon-btn" data-company-contact-edit="' + ct.id + '">編輯</button></td>' : '') + '</tr>';
+    }).join('');
+    return head + '<table style="margin:0;"><thead><tr><th style="padding-left:40px;">姓名</th><th>部門</th><th>職稱</th>' +
+      '<th>負責項目／功能</th><th>狀態</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+  }
+
+  document.getElementById('companySearchInput').addEventListener('input', debounce(function(){ renderCompaniesTable(); }, 250));
+  document.getElementById('companyFilterType').addEventListener('change', renderCompaniesTable);
+
   function resetCompanyForm(){
-    ['co_name_original','co_name_english','co_website','co_country','co_address_original','co_address_english'].forEach(function(id){
+    ['co_name_original','co_name_english','co_website','co_country','co_address_original','co_address_english','co_industry','co_note'].forEach(function(id){
       document.getElementById(id).value = '';
     });
+    document.getElementById('co_company_type').value = '客戶';
     editingCompanyId = null;
     document.getElementById('saveCompanyBtn').textContent = '新增公司';
     document.getElementById('cancelCompanyBtn').style.display = 'none';
@@ -2280,12 +2419,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     if(!rec) return;
     editingCompanyId = id;
     document.getElementById('companyFormCard').open = true;
+    document.getElementById('co_company_type').value = rec.company_type || '客戶';
+    document.getElementById('co_industry').value = rec.industry || '';
     document.getElementById('co_name_original').value = rec.name_original || '';
     document.getElementById('co_name_english').value = rec.name_english || '';
     document.getElementById('co_website').value = rec.website || '';
     document.getElementById('co_country').value = rec.country || '';
     document.getElementById('co_address_original').value = rec.address_original || '';
     document.getElementById('co_address_english').value = rec.address_english || '';
+    document.getElementById('co_note').value = rec.note || '';
     applyRtlAwareness(document.getElementById('co_name_original'));
     applyRtlAwareness(document.getElementById('co_address_original'));
     document.getElementById('saveCompanyBtn').textContent = '更新公司';
@@ -2298,12 +2440,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var nameEnglish = document.getElementById('co_name_english').value.trim();
     if(!nameOriginal && !nameEnglish){ msg.textContent = '公司名稱（原文或英文）至少填一個'; return; }
     var payload = {
+      company_type: document.getElementById('co_company_type').value || '客戶',
+      industry: document.getElementById('co_industry').value.trim() || null,
       name_original: nameOriginal || null,
       name_english: nameEnglish || null,
       website: document.getElementById('co_website').value.trim() || null,
       country: document.getElementById('co_country').value.trim() || null,
       address_original: document.getElementById('co_address_original').value.trim() || null,
-      address_english: document.getElementById('co_address_english').value.trim() || null
+      address_english: document.getElementById('co_address_english').value.trim() || null,
+      note: document.getElementById('co_note').value.trim() || null
     };
     showLoading(true);
     try{
@@ -2342,7 +2487,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   function refreshContactFormSelects(){
     fillSelect(document.getElementById('c_source_exhibition'), state.exhibitions, '未指定來源展覽（選填）', 'id', 'name');
     var companyOptions = state.companies.map(function(co){
-      return { id: co.id, label: co.name_original || co.name_english || '（未命名公司）' };
+      return { id: co.id, label: '［' + (co.company_type || '客戶') + '］' + companyDisplayName(co) };
     });
     fillSelect(document.getElementById('c_company'), companyOptions, '未指定公司（選填）', 'id', 'label');
     fillSelect(document.getElementById('c_identity_category'), state.identityWeights, '未分類（選填）', 'category', 'category');
@@ -2369,6 +2514,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     state.profiles.forEach(function(p){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; ownerSel.appendChild(o); });
     if(state.profiles.some(function(p){return p.id===keepOwner;})) ownerSel.value = keepOwner;
   }
+  document.getElementById('contactFilterCompanyType').addEventListener('change', renderContactsTable);
   document.getElementById('contactFilterExhibition').addEventListener('change', renderContactsTable);
   document.getElementById('contactFilterOwner').addEventListener('change', renderContactsTable);
   document.getElementById('contactFilterImportance').addEventListener('change', renderContactsTable);
@@ -2408,6 +2554,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       department_english: document.getElementById('c_department_english').value.trim() || null,
       title_original: document.getElementById('c_title_original').value.trim() || null,
       title_english: document.getElementById('c_title_english').value.trim() || null,
+      responsibility: document.getElementById('c_responsibility').value.trim() || null,
       country: document.getElementById('c_country').value.trim() || null,
       address_original: document.getElementById('c_address_original').value.trim() || null,
       address_english: document.getElementById('c_address_english').value.trim() || null,
@@ -2487,6 +2634,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('c_department_english').value = rec.department_english || '';
     document.getElementById('c_title_original').value = rec.title_original || '';
     document.getElementById('c_title_english').value = rec.title_english || '';
+    document.getElementById('c_responsibility').value = rec.responsibility || '';
     document.getElementById('c_country').value = rec.country || '';
     document.getElementById('c_address_original').value = rec.address_original || '';
     document.getElementById('c_address_english').value = rec.address_english || '';
@@ -2607,8 +2755,12 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var filterOwner = document.getElementById('contactFilterOwner').value;
     var filterImportance = document.getElementById('contactFilterImportance').value;
     var filterStatus = document.getElementById('contactFilterStatus').value;
+    var filterCompanyType = document.getElementById('contactFilterCompanyType').value;
 
     var rows = state.contacts.filter(function(c){
+      if(filterCompanyType){
+        if(!c.company || (c.company.company_type || '客戶') !== filterCompanyType) return false;
+      }
       if(filterExhibition){
         var inExhibition = (c.event_contacts||[]).some(function(ec){ return ec.exhibition_id === filterExhibition; });
         if(!inExhibition) return false;
@@ -2630,12 +2782,13 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       return;
     }
     var writable = canWrite();
-    var colspan = writable ? 9 : 8;
+    var colspan = writable ? 11 : 10;
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th></th><th>姓名</th><th>公司</th><th>職稱</th><th>重要程度</th>' +
+      '<th></th><th>姓名</th><th>公司</th><th>公司類型</th><th>職稱</th><th>負責項目</th><th>重要程度</th>' +
       '<th class="num">聯絡人價值分數</th><th>狀態</th><th>負責業務</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
     rows.forEach(function(c){
-      var companyName = c.company ? (c.company.name_original || c.company.name_english || '—') : '—';
+      var companyName = c.company ? companyDisplayName(c.company) : '—';
+      var companyType = c.company ? (c.company.company_type || '客戶') : '—';
       var title = c.title_original || c.title_english || '—';
       var ownerName = c.owner ? c.owner.name : '—';
       var expanded = !!expandedContactIds[c.id];
@@ -2643,7 +2796,9 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         '<td><button type="button" class="icon-btn" data-toggle-contact="' + c.id + '">' + (expanded ? '▾' : '▸') + '</button></td>' +
         '<td>' + escapeHtml(c.name_original || c.name_english || '—') + '</td>' +
         '<td>' + escapeHtml(companyName) + '</td>' +
+        '<td>' + (c.company ? '<span class="tag">' + escapeHtml(companyType) + '</span>' : '—') + '</td>' +
         '<td>' + escapeHtml(title) + '</td>' +
+        '<td>' + escapeHtml(c.responsibility || '—') + '</td>' +
         '<td><span class="tag">' + escapeHtml(c.importance) + '</span></td>' +
         '<td class="num">' + (c.contact_score != null ? fmtNum(c.contact_score, 1) : '—') + '</td>' +
         '<td><span class="tag">' + escapeHtml(c.status) + '</span></td>' +

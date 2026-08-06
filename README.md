@@ -18,7 +18,10 @@
 - ✅ 儀表板改成合併總覽（費用＋CRM 統計都在同一頁），費用管理／客戶名單 CRM 拆成
   兩個入口，使用者管理維持獨立可隨時進入
 - ✅ 名片 AI 掃描辨識（用 Google Gemini，拍照/上傳名片後自動預填聯絡人表單，
-  同一張名片重複掃描會沿用上次結果、不重複計費）
+  名片上的公司會自動比對／自動建檔，同一張名片重複掃描會沿用上次結果、不重複計費）
+- ✅ 公司分類（客戶／供應商／媒體／合作夥伴）與產業類別，行銷可以用同一套系統
+  建立禮贈品、印刷、電視台、報社等供應商與媒體人脈；同一家公司的成員會歸類
+  在一起，展開公司即可看到人員清單與各自的負責項目
 - ⏳ 離線掃描佇列、重複聯絡人偵測、客戶自填表單、草稿暫存 — 下一階段
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
@@ -52,6 +55,9 @@
   `contact_logs`）＋ `tasks`（待辦事項）＋ `products`（感興趣產品清單，含初始
   資料）＋ `business_cards` / `public_lead_submissions`（先建表，之後幾批才會接
   上實際畫面），會先刪除舊的 `leads`／`contact_logs` 表（含裡面的資料）再重建。
+- `supabase/sql/09_company_types_and_responsibility.sql` — `companies` 新增類型
+  （客戶／供應商／媒體／合作夥伴／其他）、產業類別、備註欄位，`contacts` 新增
+  「負責項目／功能」欄位，讓 CRM 除了客戶之外也能管理供應商與媒體人脈。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 - `supabase/functions/card-ocr/` — 名片辨識的 Supabase Edge Function，前端把名片
@@ -148,7 +154,14 @@ supabase functions deploy bot-rate
 3. 這支函式只有 admin/editor 能呼叫，而且每次辨識都會呼叫 Gemini API 產生費用
    （同一張名片重複掃描會直接沿用上次的辨識結果，不會重複呼叫）
 
-### 12. 部署 GitHub Pages
+### 12. 公司分類與聯絡人負責項目
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/09_company_types_and_responsibility.sql` 的全部內容，執行
+3. 既有的公司資料會自動歸到「客戶」這個類型，之後可以在畫面上逐筆改成
+   供應商／媒體／合作夥伴
+
+### 13. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
