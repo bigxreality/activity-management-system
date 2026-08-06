@@ -544,15 +544,50 @@
     </details>
 
     <details class="card card-pad form-card" id="companyFormCard">
-      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">公司管理</summary>
+      <summary style="font-family:var(--font-display);font-weight:600;font-size:14.5px;">公司管理（客戶／供應商／媒體人脈）</summary>
+      <div class="toolbar" style="margin-top:12px;">
+        <div class="toolbar-left" style="flex-wrap:wrap;">
+          <input type="text" id="companySearchInput" placeholder="搜尋公司名稱" style="border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 10px;font-size:13px;">
+          <select id="companyFilterType">
+            <option value="">全部類型</option>
+            <option value="客戶">客戶</option>
+            <option value="供應商">供應商</option>
+            <option value="媒體">媒體</option>
+            <option value="合作夥伴">合作夥伴</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
       <div id="companiesTableWrap" style="margin-top:12px;"></div>
       <div class="form-grid" style="margin-top:12px;">
+        <div class="field">
+          <label>類型 <span class="req">*</span></label>
+          <select id="co_company_type">
+            <option value="客戶">客戶</option>
+            <option value="供應商">供應商</option>
+            <option value="媒體">媒體</option>
+            <option value="合作夥伴">合作夥伴</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>產業／類別</label>
+          <input type="text" id="co_industry" list="industryOptions" placeholder="可自訂輸入">
+          <datalist id="industryOptions">
+            <option value="禮贈品"><option value="印刷"><option value="展場設計"><option value="攤位搭建">
+            <option value="運輸物流"><option value="設備租借"><option value="影音製作"><option value="翻譯服務">
+            <option value="人力派遣"><option value="電視台"><option value="報社"><option value="雜誌">
+            <option value="網路媒體"><option value="公關公司"><option value="政府單位"><option value="軍警單位">
+            <option value="系統整合商"><option value="代理經銷"><option value="其他">
+          </datalist>
+        </div>
         <div class="field"><label>公司名稱（原文）</label><input type="text" id="co_name_original" class="rtl-aware"></div>
         <div class="field"><label>公司名稱（英文）</label><input type="text" id="co_name_english"></div>
         <div class="field"><label>網站</label><input type="text" id="co_website" placeholder="https://..."></div>
         <div class="field"><label>國家</label><input type="text" id="co_country"></div>
         <div class="field span-2"><label>地址（原文）</label><input type="text" id="co_address_original" class="rtl-aware"></div>
         <div class="field span-2"><label>地址（英文）</label><input type="text" id="co_address_english"></div>
+        <div class="field span-2"><label>備註</label><input type="text" id="co_note" placeholder="選填"></div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-primary btn-sm" id="saveCompanyBtn">新增公司</button>
@@ -583,10 +618,6 @@
             <label>來源展覽</label>
             <select id="c_source_exhibition"></select>
           </div>
-          <div class="field span-2">
-            <label>公司</label>
-            <select id="c_company"></select>
-          </div>
           <div class="field">
             <label>重要程度</label>
             <select id="c_importance">
@@ -613,22 +644,6 @@
               <option value="教育研究單位"><option value="合作夥伴"><option value="供應商">
               <option value="媒體"><option value="終端客戶"><option value="其他">
             </datalist>
-          </div>
-          <div class="field">
-            <label>部門（原文）</label>
-            <input type="text" id="c_department_original" class="rtl-aware">
-          </div>
-          <div class="field">
-            <label>部門（英文）</label>
-            <input type="text" id="c_department_english">
-          </div>
-          <div class="field">
-            <label>職稱（原文）</label>
-            <input type="text" id="c_title_original" class="rtl-aware">
-          </div>
-          <div class="field">
-            <label>職稱（英文）</label>
-            <input type="text" id="c_title_english">
           </div>
           <div class="field">
             <label>國家</label>
@@ -677,6 +692,13 @@
         </div>
 
         <div class="sub-form-section">
+          <h4 class="sub-form-heading">所屬單位與職稱</h4>
+          <p class="hint" style="margin:-6px 0 10px;color:var(--ink-faint);font-size:12px;">同一個人可以有多重身分（例如同時是 A 公司總經理、B 公司總裁、扶輪社社長），每一段各自填自己的職稱與部門。勾選「主要」的那一段會顯示在名單列表上。</p>
+          <div id="affiliationRowsWrap"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="addAffiliationRowBtn">+ 新增身分</button>
+        </div>
+
+        <div class="sub-form-section">
           <h4 class="sub-form-heading">聯絡方式</h4>
           <div id="contactMethodRowsWrap"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="addContactMethodRowBtn">+ 新增聯絡方式</button>
@@ -712,6 +734,14 @@
         <div class="toolbar">
           <div class="toolbar-left" style="flex-wrap:wrap;">
             <input type="text" id="contactSearchInput" placeholder="搜尋姓名/公司/Email/電話" style="border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 10px;font-size:13px;">
+            <select id="contactFilterCompanyType">
+              <option value="">全部公司類型</option>
+              <option value="客戶">客戶</option>
+              <option value="供應商">供應商</option>
+              <option value="媒體">媒體</option>
+              <option value="合作夥伴">合作夥伴</option>
+              <option value="其他">其他</option>
+            </select>
             <select id="contactFilterExhibition"><option value="">全部展覽</option></select>
             <select id="contactFilterOwner"><option value="">全部負責業務</option></select>
             <select id="contactFilterImportance">
@@ -821,6 +851,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   var editingContactId = null;
   var editingCompanyId = null;
   var expandedContactIds = {};
+  var expandedCompanyIds = {};
   var CONTACT_STATUSES = ["新名單","追蹤中","已報價","已成交","已流失"];
   var CONTACT_METHOD_TYPES = ['email','mobile','office_phone','fax','website','LINE','WhatsApp','WeChat','LinkedIn','other'];
   var CONTACT_METHOD_LABELS = { email:'Email', mobile:'手機', office_phone:'公司電話', fax:'傳真', website:'網站', LINE:'LINE', WhatsApp:'WhatsApp', WeChat:'WeChat', LinkedIn:'LinkedIn', other:'其他' };
@@ -1096,7 +1127,8 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       var companiesRes = await supabase.from('companies').select('*').order('name_original');
       if(companiesRes.error) throw companiesRes.error;
       var contactsRes = await supabase.from('contacts')
-        .select('*, company:companies(*), owner:profiles!owner_id(id,name), contact_methods(*), ' +
+        .select('*, owner:profiles!owner_id(id,name), contact_methods(*), ' +
+          'contact_affiliations(*, company:companies(*)), ' +
           'event_contacts(exhibition_id, interested_products, onsite_notes, next_action, exhibition:exhibitions(id,name)), ' +
           'interactions(*), tasks(*)')
         .order('created_at', { ascending:false });
@@ -1118,6 +1150,10 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         c.contact_score = computeContactScore(c, weightsMap);
         c.interactions = (c.interactions || []).slice().sort(function(a,b){ return (b.interaction_date||'').localeCompare(a.interaction_date||''); });
         c.tasks = (c.tasks || []).slice().sort(function(a,b){ return (a.due_date||'').localeCompare(b.due_date||''); });
+        // 主要身分排在最前面，之後取「第一段」就是主要那段
+        c.contact_affiliations = (c.contact_affiliations || []).slice().sort(function(a,b){
+          return (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0);
+        });
         return c;
       });
       renderAll();
@@ -2029,6 +2065,113 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
   document.getElementById('addContactMethodRowBtn').addEventListener('click', function(){ addContactMethodRow(); });
 
+  // ---------------- CRM：所屬單位與職稱（一個人可以有多重身分） ----------------
+  function affiliationRowNode(values){
+    values = values || {};
+    var div = document.createElement('div');
+    div.className = 'item-row';
+    div.dataset.affiliationId = values.id || crypto.randomUUID();
+    div.innerHTML =
+      '<div class="item-row-grid" style="grid-template-columns:2fr 1fr 1fr;">' +
+        '<div class="field"><label>單位／公司</label><select class="aff-company"></select></div>' +
+        '<div class="field"><label>職稱（原文）</label><input type="text" class="aff-title-original rtl-aware" value="' + escapeHtml(values.title_original || '') + '"></div>' +
+        '<div class="field"><label>職稱（英文）</label><input type="text" class="aff-title-english" value="' + escapeHtml(values.title_english || '') + '"></div>' +
+        '<div class="field"><label>部門（原文）</label><input type="text" class="aff-department-original rtl-aware" value="' + escapeHtml(values.department_original || '') + '"></div>' +
+        '<div class="field"><label>部門（英文）</label><input type="text" class="aff-department-english" value="' + escapeHtml(values.department_english || '') + '"></div>' +
+        '<div class="field"><label>負責項目／功能</label><input type="text" class="aff-responsibility" placeholder="例如：採購決策者" value="' + escapeHtml(values.responsibility || '') + '"></div>' +
+      '</div>' +
+      '<div class="item-row-footer">' +
+        '<label style="font-size:12.5px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;">' +
+          '<input type="radio" name="affPrimary" class="aff-primary"' + (values.is_primary ? ' checked' : '') + '> 主要身分' +
+        '</label>' +
+        '<button type="button" class="icon-btn danger aff-remove-btn">移除這段身分</button>' +
+      '</div>';
+    return div;
+  }
+  function addAffiliationRow(values){
+    var wrap = document.getElementById('affiliationRowsWrap');
+    var row = affiliationRowNode(values);
+    wrap.appendChild(row);
+    fillAffiliationCompanySelect(row.querySelector('.aff-company'), values && values.company_id);
+    row.querySelector('.aff-remove-btn').addEventListener('click', function(){
+      row.remove();
+      ensureOnePrimaryAffiliation();
+    });
+    row.querySelectorAll('.rtl-aware').forEach(function(input){
+      applyRtlAwareness(input);
+      input.addEventListener('input', function(){ applyRtlAwareness(input); });
+    });
+    ensureOnePrimaryAffiliation();
+  }
+  function fillAffiliationCompanySelect(sel, selectedId){
+    var options = state.companies.map(function(co){
+      return { id: co.id, label: '［' + (co.company_type || '客戶') + '］' + companyDisplayName(co) };
+    });
+    fillSelect(sel, options, '未指定單位（選填）', 'id', 'label');
+    if(selectedId) sel.value = selectedId;
+  }
+  function refreshAffiliationCompanySelects(){
+    document.querySelectorAll('#affiliationRowsWrap .aff-company').forEach(function(sel){
+      fillAffiliationCompanySelect(sel, sel.value);
+    });
+  }
+  // 沒有任何一段被標成主要時，自動把第一段設為主要，避免名單列表沒東西可顯示
+  function ensureOnePrimaryAffiliation(){
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#affiliationRowsWrap .item-row'));
+    if(rows.length === 0) return;
+    var hasPrimary = rows.some(function(r){ return r.querySelector('.aff-primary').checked; });
+    if(!hasPrimary) rows[0].querySelector('.aff-primary').checked = true;
+  }
+  function clearAffiliationRows(){
+    document.getElementById('affiliationRowsWrap').innerHTML = '';
+  }
+  function getAffiliationRowsData(){
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#affiliationRowsWrap .item-row'));
+    var result = [];
+    rows.forEach(function(row){
+      var companyId = row.querySelector('.aff-company').value || null;
+      var titleOriginal = row.querySelector('.aff-title-original').value.trim();
+      var titleEnglish = row.querySelector('.aff-title-english').value.trim();
+      var deptOriginal = row.querySelector('.aff-department-original').value.trim();
+      var deptEnglish = row.querySelector('.aff-department-english').value.trim();
+      var responsibility = row.querySelector('.aff-responsibility').value.trim();
+      // 整段都空白就跳過，不要存一筆什麼都沒有的身分
+      if(!companyId && !titleOriginal && !titleEnglish && !deptOriginal && !deptEnglish && !responsibility) return;
+      result.push({
+        company_id: companyId,
+        title_original: titleOriginal || null,
+        title_english: titleEnglish || null,
+        department_original: deptOriginal || null,
+        department_english: deptEnglish || null,
+        responsibility: responsibility || null,
+        is_primary: row.querySelector('.aff-primary').checked
+      });
+    });
+    // 同一個人在同一個單位只能有一段身分（資料庫有 unique 限制），先在前端擋掉
+    var seen = {};
+    for(var i = 0; i < result.length; i++){
+      var key = result[i].company_id;
+      if(key){
+        if(seen[key]) return { error: '同一個單位只能填一段身分，請合併重複的那幾段' };
+        seen[key] = true;
+      }
+    }
+    if(result.length && !result.some(function(a){ return a.is_primary; })) result[0].is_primary = true;
+    return { rows: result };
+  }
+  document.getElementById('addAffiliationRowBtn').addEventListener('click', function(){ addAffiliationRow(); });
+
+  // 名單列表/公司成員清單都要用「主要身分」來顯示公司與職稱
+  function primaryAffiliation(contact){
+    var list = contact.contact_affiliations || [];
+    if(list.length === 0) return null;
+    return list.filter(function(a){ return a.is_primary; })[0] || list[0];
+  }
+  function affiliationTitle(aff){
+    if(!aff) return '';
+    return aff.title_original || aff.title_english || '';
+  }
+
   // ---------------- CRM：名片辨識（AI 自動預填聯絡人表單） ----------------
   function fileToBase64(file){
     return new Promise(function(resolve, reject){
@@ -2073,34 +2216,62 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   document.getElementById('cardScanCameraInput').addEventListener('change', handleCardScanFileChange);
   document.getElementById('cardScanFilesInput').addEventListener('change', handleCardScanFileChange);
 
-  function fillContactFormFromCardScan(result){
+  // 名片上的公司：先找系統裡有沒有同名的，沒有就自動建一筆，這樣同一家公司的
+  // 成員掃進來會自動歸在同一間公司底下，不用每次手動先去「公司管理」新增。
+  // 比對時忽略大小寫與前後空白，避免同一家公司被建成好幾筆。
+  async function resolveCompanyFromCardScan(result){
+    var nameOriginal = (result.company_name_original || '').trim();
+    var nameEnglish = (result.company_name_english || '').trim();
+    if(!nameOriginal && !nameEnglish) return null;
+
+    function norm(s){ return (s || '').trim().toLowerCase(); }
+    var matched = state.companies.find(function(co){
+      return (nameOriginal && norm(co.name_original) === norm(nameOriginal)) ||
+        (nameEnglish && norm(co.name_english) === norm(nameEnglish));
+    });
+    if(matched) return matched;
+
+    var insertRes = await supabase.from('companies').insert({
+      company_type: '客戶',
+      name_original: nameOriginal || null,
+      name_english: nameEnglish || null,
+      country: result.country || null,
+      address_original: result.address_original || null,
+      address_english: result.address_english || null
+    }).select().maybeSingle();
+    if(insertRes.error){
+      toast('自動建立公司失敗：' + insertRes.error.message);
+      return null;
+    }
+    if(insertRes.data){
+      state.companies.push(insertRes.data);
+      refreshContactFormSelects();
+      toast('已自動建立公司「' + (nameOriginal || nameEnglish) + '」');
+    }
+    return insertRes.data;
+  }
+
+  async function fillContactFormFromCardScan(result){
     if(!result) return;
     document.getElementById('contactFormCard').open = true;
     document.getElementById('c_name_original').value = result.name_original || '';
     document.getElementById('c_name_english').value = result.name_english || '';
-    document.getElementById('c_department_original').value = result.department_original || '';
-    document.getElementById('c_department_english').value = result.department_english || '';
-    document.getElementById('c_title_original').value = result.title_original || '';
-    document.getElementById('c_title_english').value = result.title_english || '';
     document.getElementById('c_country').value = result.country || '';
     document.getElementById('c_address_original').value = result.address_original || '';
     document.getElementById('c_address_english').value = result.address_english || '';
 
-    var companyNameOriginal = (result.company_name_original || '').trim();
-    var companyNameEnglish = (result.company_name_english || '').trim();
-    var matchedCompany = null;
-    if(companyNameOriginal || companyNameEnglish){
-      matchedCompany = state.companies.find(function(co){
-        return (companyNameOriginal && co.name_original && co.name_original.trim() === companyNameOriginal) ||
-          (companyNameEnglish && co.name_english && co.name_english.trim() === companyNameEnglish);
-      });
-    }
-    if(matchedCompany){
-      document.getElementById('c_company').value = matchedCompany.id;
-    } else if(companyNameOriginal || companyNameEnglish){
-      document.getElementById('c_company').value = '';
-      toast('名片上的公司「' + (companyNameOriginal || companyNameEnglish) + '」在系統裡找不到，可以先去上面「公司管理」新增');
-    }
+    // 名片上的公司＋職稱＋部門是「同一段身分」，一起填進第一列所屬單位。
+    // 這個人如果還有其他身分（B 公司、扶輪社…），使用者再自己按「+ 新增身分」補。
+    var company = await resolveCompanyFromCardScan(result);
+    clearAffiliationRows();
+    addAffiliationRow({
+      company_id: company ? company.id : null,
+      title_original: result.title_original || '',
+      title_english: result.title_english || '',
+      department_original: result.department_original || '',
+      department_english: result.department_english || '',
+      is_primary: true
+    });
 
     clearContactMethodRows();
     var methods = result.contact_methods || [];
@@ -2123,7 +2294,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(existingRes.error) throw existingRes.error;
       if(existingRes.data && existingRes.data.recognition_json){
         cardScanState.businessCardId = existingRes.data.id;
-        fillContactFormFromCardScan(existingRes.data.recognition_json);
+        await fillContactFormFromCardScan(existingRes.data.recognition_json);
         statusEl.textContent = '這張名片之前掃描過，直接沿用上次的辨識結果（沒有重新呼叫 AI，不會重複計費）';
         return;
       }
@@ -2159,7 +2330,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(insertRes.error) throw insertRes.error;
 
       cardScanState.businessCardId = insertRes.data ? insertRes.data.id : null;
-      fillContactFormFromCardScan(ocrData.result);
+      await fillContactFormFromCardScan(ocrData.result);
       statusEl.textContent = '✅ 已帶入辨識結果，請檢查後再儲存';
     }catch(err){
       statusEl.textContent = '辨識失敗：' + err.message;
@@ -2244,31 +2415,110 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   });
 
   // ---------------- CRM：公司管理 ----------------
+  function companyDisplayName(c){
+    if(!c) return '—';
+    var name = c.name_original || c.name_english || '（未命名）';
+    if(c.name_original && c.name_english && c.name_original !== c.name_english) name += '／' + c.name_english;
+    return name;
+  }
+  // 一個人可能有多重身分，這裡回傳「在這個單位的那一段身分」跟人本身，
+  // 這樣人員清單顯示的職稱/部門才是他在這個單位的職稱，不是別家公司的
+  function contactsOfCompany(companyId){
+    var result = [];
+    state.contacts.forEach(function(ct){
+      var aff = (ct.contact_affiliations || []).filter(function(a){ return a.company_id === companyId; })[0];
+      if(aff) result.push({ contact: ct, affiliation: aff });
+    });
+    return result;
+  }
+
   function renderCompaniesTable(){
     var wrap = document.getElementById('companiesTableWrap');
-    if(state.companies.length === 0){ wrap.innerHTML = '<div class="empty-state">尚無公司資料。</div>'; return; }
+    var search = document.getElementById('companySearchInput').value.trim().toLowerCase();
+    var filterType = document.getElementById('companyFilterType').value;
+    var rows = state.companies.filter(function(c){
+      if(filterType && (c.company_type || '客戶') !== filterType) return false;
+      if(search){
+        var haystack = [c.name_original, c.name_english, c.industry].join(' ').toLowerCase();
+        if(haystack.indexOf(search) < 0) return false;
+      }
+      return true;
+    });
+    if(rows.length === 0){ wrap.innerHTML = '<div class="empty-state">尚無符合條件的公司。</div>'; return; }
     var writable = canWrite();
-    var html = '<div style="overflow-x:auto;"><table><thead><tr><th>公司名稱</th><th>網站</th><th>國家</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
-    state.companies.forEach(function(c){
-      var name = c.name_original || c.name_english || '（未命名）';
-      if(c.name_original && c.name_english) name += '／' + c.name_english;
-      html += '<tr><td>' + escapeHtml(name) + '</td>' +
-        '<td>' + (c.website ? '<a href="' + escapeHtml(c.website) + '" target="_blank" rel="noopener">' + escapeHtml(c.website) + '</a>' : '—') + '</td>' +
+    var colspan = writable ? 7 : 6;
+    var html = '<div style="overflow-x:auto;"><table><thead><tr><th></th><th>公司名稱</th><th>類型</th><th>產業／類別</th>' +
+      '<th class="num">成員</th><th>國家</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
+    rows.forEach(function(c){
+      var members = contactsOfCompany(c.id);
+      var expanded = !!expandedCompanyIds[c.id];
+      html += '<tr>' +
+        '<td><button type="button" class="icon-btn" data-toggle-company="' + c.id + '">' + (expanded ? '▾' : '▸') + '</button></td>' +
+        '<td style="font-weight:600;">' + escapeHtml(companyDisplayName(c)) +
+          (c.website ? ' <a href="' + escapeHtml(c.website) + '" target="_blank" rel="noopener" style="font-weight:400;font-size:11px;">🔗</a>' : '') + '</td>' +
+        '<td><span class="tag">' + escapeHtml(c.company_type || '客戶') + '</span></td>' +
+        '<td>' + escapeHtml(c.industry || '—') + '</td>' +
+        '<td class="num">' + members.length + '</td>' +
         '<td>' + escapeHtml(c.country || '—') + '</td>' +
         (writable ? ('<td><div class="row-actions">' +
           '<button class="icon-btn" data-co-edit="' + c.id + '">編輯</button>' +
           '<button class="icon-btn danger" data-co-del="' + c.id + '">刪除</button>' +
         '</div></td>') : '') + '</tr>';
+      html += '<tr class="item-detail-row" data-company-detail="' + c.id + '" style="display:' + (expanded ? 'table-row' : 'none') + ';">' +
+        '<td colspan="' + colspan + '" style="background:var(--surface-alt);">' + renderCompanyMembers(c, members) + '</td></tr>';
     });
     html += '</tbody></table></div>';
+    html += '<div class="table-footer"><span>共 ' + rows.length + ' 間公司</span></div>';
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-co-edit]').forEach(function(b){ b.addEventListener('click', function(){ editCompany(b.dataset.coEdit); }); });
     wrap.querySelectorAll('[data-co-del]').forEach(function(b){ b.addEventListener('click', function(){ deleteCompany(b.dataset.coDel); }); });
+    wrap.querySelectorAll('[data-company-contact-edit]').forEach(function(b){
+      b.addEventListener('click', function(){ editContact(b.dataset.companyContactEdit); });
+    });
+    wrap.querySelectorAll('[data-toggle-company]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var id = b.dataset.toggleCompany;
+        var row = wrap.querySelector('[data-company-detail="' + id + '"]');
+        var showing = row.style.display !== 'none';
+        row.style.display = showing ? 'none' : 'table-row';
+        b.textContent = showing ? '▸' : '▾';
+        expandedCompanyIds[id] = !showing;
+      });
+    });
   }
+
+  // 同一家公司底下的人員清單：看得出每個人各自負責什麼
+  function renderCompanyMembers(company, members){
+    var head = '<div style="padding:12px 16px 4px 40px;"><strong>' + escapeHtml(companyDisplayName(company)) + ' 的人員清單</strong></div>';
+    if(members.length === 0){
+      return head + '<div style="padding:4px 16px 14px 40px;color:var(--ink-faint);font-size:12.5px;">這家公司底下還沒有聯絡人。</div>';
+    }
+    var writable = canWrite();
+    var rowsHtml = members.map(function(m){
+      var ct = m.contact, aff = m.affiliation;
+      var title = affiliationTitle(aff) || '—';
+      var dept = aff.department_original || aff.department_english || '—';
+      var otherCount = (ct.contact_affiliations || []).length - 1;
+      return '<tr><td style="padding-left:40px;">' + escapeHtml(ct.name_original || ct.name_english || '—') +
+          (otherCount > 0 ? ' <span class="tag" title="這個人在其他單位也有身分">＋' + otherCount + '</span>' : '') + '</td>' +
+        '<td>' + escapeHtml(dept) + '</td>' +
+        '<td>' + escapeHtml(title) + '</td>' +
+        '<td>' + escapeHtml(aff.responsibility || '—') + '</td>' +
+        '<td><span class="tag">' + escapeHtml(ct.status) + '</span></td>' +
+        (writable ? '<td><button class="icon-btn" data-company-contact-edit="' + ct.id + '">編輯</button></td>' : '') + '</tr>';
+    }).join('');
+    return head + '<table style="margin:0;"><thead><tr><th style="padding-left:40px;">姓名</th><th>部門</th><th>職稱</th>' +
+      '<th>負責項目／功能</th><th>狀態</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+  }
+
+  document.getElementById('companySearchInput').addEventListener('input', debounce(function(){ renderCompaniesTable(); }, 250));
+  document.getElementById('companyFilterType').addEventListener('change', renderCompaniesTable);
+
   function resetCompanyForm(){
-    ['co_name_original','co_name_english','co_website','co_country','co_address_original','co_address_english'].forEach(function(id){
+    ['co_name_original','co_name_english','co_website','co_country','co_address_original','co_address_english','co_industry','co_note'].forEach(function(id){
       document.getElementById(id).value = '';
     });
+    document.getElementById('co_company_type').value = '客戶';
     editingCompanyId = null;
     document.getElementById('saveCompanyBtn').textContent = '新增公司';
     document.getElementById('cancelCompanyBtn').style.display = 'none';
@@ -2280,12 +2530,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     if(!rec) return;
     editingCompanyId = id;
     document.getElementById('companyFormCard').open = true;
+    document.getElementById('co_company_type').value = rec.company_type || '客戶';
+    document.getElementById('co_industry').value = rec.industry || '';
     document.getElementById('co_name_original').value = rec.name_original || '';
     document.getElementById('co_name_english').value = rec.name_english || '';
     document.getElementById('co_website').value = rec.website || '';
     document.getElementById('co_country').value = rec.country || '';
     document.getElementById('co_address_original').value = rec.address_original || '';
     document.getElementById('co_address_english').value = rec.address_english || '';
+    document.getElementById('co_note').value = rec.note || '';
     applyRtlAwareness(document.getElementById('co_name_original'));
     applyRtlAwareness(document.getElementById('co_address_original'));
     document.getElementById('saveCompanyBtn').textContent = '更新公司';
@@ -2298,12 +2551,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var nameEnglish = document.getElementById('co_name_english').value.trim();
     if(!nameOriginal && !nameEnglish){ msg.textContent = '公司名稱（原文或英文）至少填一個'; return; }
     var payload = {
+      company_type: document.getElementById('co_company_type').value || '客戶',
+      industry: document.getElementById('co_industry').value.trim() || null,
       name_original: nameOriginal || null,
       name_english: nameEnglish || null,
       website: document.getElementById('co_website').value.trim() || null,
       country: document.getElementById('co_country').value.trim() || null,
       address_original: document.getElementById('co_address_original').value.trim() || null,
-      address_english: document.getElementById('co_address_english').value.trim() || null
+      address_english: document.getElementById('co_address_english').value.trim() || null,
+      note: document.getElementById('co_note').value.trim() || null
     };
     showLoading(true);
     try{
@@ -2341,10 +2597,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   // ---------------- CRM：聯絡人表單 ----------------
   function refreshContactFormSelects(){
     fillSelect(document.getElementById('c_source_exhibition'), state.exhibitions, '未指定來源展覽（選填）', 'id', 'name');
-    var companyOptions = state.companies.map(function(co){
-      return { id: co.id, label: co.name_original || co.name_english || '（未命名公司）' };
-    });
-    fillSelect(document.getElementById('c_company'), companyOptions, '未指定公司（選填）', 'id', 'label');
+    refreshAffiliationCompanySelects();
     fillSelect(document.getElementById('c_identity_category'), state.identityWeights, '未分類（選填）', 'category', 'category');
     fillSelect(document.getElementById('c_department_relevance'), ['1','2','3','4','5'], '未評分（選填）');
     fillSelect(document.getElementById('c_enthusiasm'), ['1','2','3','4','5'], '未評分（選填）');
@@ -2369,6 +2622,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     state.profiles.forEach(function(p){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; ownerSel.appendChild(o); });
     if(state.profiles.some(function(p){return p.id===keepOwner;})) ownerSel.value = keepOwner;
   }
+  document.getElementById('contactFilterCompanyType').addEventListener('change', renderContactsTable);
   document.getElementById('contactFilterExhibition').addEventListener('change', renderContactsTable);
   document.getElementById('contactFilterOwner').addEventListener('change', renderContactsTable);
   document.getElementById('contactFilterImportance').addEventListener('change', renderContactsTable);
@@ -2379,6 +2633,8 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   function resetContactForm(){
     document.getElementById('contactForm').reset();
     editingContactId = null;
+    clearAffiliationRows();
+    addAffiliationRow();
     clearContactMethodRows();
     addContactMethodRow();
     photoState.avatar = { pendingFile: null, existingPath: null, removed: false };
@@ -2399,15 +2655,13 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var nameOriginal = document.getElementById('c_name_original').value.trim();
     if(!nameOriginal){ msg.textContent = '請填寫姓名（原文）'; return; }
     var methods = getContactMethodRowsData();
+    var affResult = getAffiliationRowsData();
+    if(affResult.error){ msg.textContent = affResult.error; return; }
+    var affiliations = affResult.rows;
 
     var payload = {
-      company_id: document.getElementById('c_company').value || null,
       name_original: nameOriginal,
       name_english: document.getElementById('c_name_english').value.trim() || null,
-      department_original: document.getElementById('c_department_original').value.trim() || null,
-      department_english: document.getElementById('c_department_english').value.trim() || null,
-      title_original: document.getElementById('c_title_original').value.trim() || null,
-      title_english: document.getElementById('c_title_english').value.trim() || null,
       country: document.getElementById('c_country').value.trim() || null,
       address_original: document.getElementById('c_address_original').value.trim() || null,
       address_english: document.getElementById('c_address_english').value.trim() || null,
@@ -2449,6 +2703,22 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         if(cmRes.error) throw cmRes.error;
       }
 
+      // 所屬單位同理：筆數少，刪掉重建最單純
+      var delAffRes = await supabase.from('contact_affiliations').delete().eq('contact_id', contactId);
+      if(delAffRes.error) throw delAffRes.error;
+      if(affiliations.length){
+        var affPayload = affiliations.map(function(a){
+          return {
+            contact_id: contactId, company_id: a.company_id,
+            title_original: a.title_original, title_english: a.title_english,
+            department_original: a.department_original, department_english: a.department_english,
+            responsibility: a.responsibility, is_primary: a.is_primary
+          };
+        });
+        var affRes = await supabase.from('contact_affiliations').insert(affPayload);
+        if(affRes.error) throw affRes.error;
+      }
+
       var sourceExhibitionId = document.getElementById('c_source_exhibition').value;
       if(sourceExhibitionId){
         var ecRes = await supabase.from('event_contacts').upsert(
@@ -2478,15 +2748,10 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     editingContactId = id;
     document.getElementById('contactFormCard').open = true;
     document.getElementById('c_source_exhibition').value = '';
-    document.getElementById('c_company').value = rec.company_id || '';
     document.getElementById('c_importance').value = rec.importance || '未分類';
     document.getElementById('c_name_original').value = rec.name_original || '';
     document.getElementById('c_name_english').value = rec.name_english || '';
     document.getElementById('c_customer_type').value = rec.customer_type || '';
-    document.getElementById('c_department_original').value = rec.department_original || '';
-    document.getElementById('c_department_english').value = rec.department_english || '';
-    document.getElementById('c_title_original').value = rec.title_original || '';
-    document.getElementById('c_title_english').value = rec.title_english || '';
     document.getElementById('c_country').value = rec.country || '';
     document.getElementById('c_address_original').value = rec.address_original || '';
     document.getElementById('c_address_english').value = rec.address_english || '';
@@ -2499,6 +2764,11 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     document.getElementById('c_deal_date').value = rec.deal_date || '';
     document.getElementById('c_owner').value = rec.owner_id || '';
     document.getElementById('c_note').value = rec.note || '';
+
+    clearAffiliationRows();
+    var affiliations = rec.contact_affiliations || [];
+    if(affiliations.length === 0){ addAffiliationRow(); }
+    else{ affiliations.forEach(function(a){ addAffiliationRow(a); }); }
 
     clearContactMethodRows();
     var methods = rec.contact_methods || [];
@@ -2607,8 +2877,18 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     var filterOwner = document.getElementById('contactFilterOwner').value;
     var filterImportance = document.getElementById('contactFilterImportance').value;
     var filterStatus = document.getElementById('contactFilterStatus').value;
+    var filterCompanyType = document.getElementById('contactFilterCompanyType').value;
 
     var rows = state.contacts.filter(function(c){
+      var affs = c.contact_affiliations || [];
+      // 多重身分：任何一段身分的單位符合就算符合，例如篩「媒體」時，
+      // 某個人的本業是客戶但同時是報社顧問，也應該被找出來
+      if(filterCompanyType){
+        var matchType = affs.some(function(a){
+          return a.company && (a.company.company_type || '客戶') === filterCompanyType;
+        });
+        if(!matchType) return false;
+      }
       if(filterExhibition){
         var inExhibition = (c.event_contacts||[]).some(function(ec){ return ec.exhibition_id === filterExhibition; });
         if(!inExhibition) return false;
@@ -2617,9 +2897,12 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(filterImportance && c.importance !== filterImportance) return false;
       if(filterStatus && c.status !== filterStatus) return false;
       if(search){
-        var companyName = c.company ? ((c.company.name_original||'') + ' ' + (c.company.name_english||'')) : '';
+        var affText = affs.map(function(a){
+          return [a.company ? a.company.name_original : '', a.company ? a.company.name_english : '',
+            a.title_original, a.title_english, a.responsibility].join(' ');
+        }).join(' ');
         var methodsText = (c.contact_methods||[]).map(function(m){ return m.value_original||''; }).join(' ');
-        var haystack = [c.name_original, c.name_english, companyName, methodsText].join(' ').toLowerCase();
+        var haystack = [c.name_original, c.name_english, affText, methodsText].join(' ').toLowerCase();
         if(haystack.indexOf(search) < 0) return false;
       }
       return true;
@@ -2630,20 +2913,27 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       return;
     }
     var writable = canWrite();
-    var colspan = writable ? 9 : 8;
+    var colspan = writable ? 11 : 10;
     var html = '<div style="overflow-x:auto;"><table><thead><tr>' +
-      '<th></th><th>姓名</th><th>公司</th><th>職稱</th><th>重要程度</th>' +
+      '<th></th><th>姓名</th><th>公司</th><th>公司類型</th><th>職稱</th><th>負責項目</th><th>重要程度</th>' +
       '<th class="num">聯絡人價值分數</th><th>狀態</th><th>負責業務</th>' + (writable ? '<th></th>' : '') + '</tr></thead><tbody>';
     rows.forEach(function(c){
-      var companyName = c.company ? (c.company.name_original || c.company.name_english || '—') : '—';
-      var title = c.title_original || c.title_english || '—';
+      var primary = primaryAffiliation(c);
+      var primaryCompany = primary ? primary.company : null;
+      // 有多重身分時在公司名稱後面標「＋N」，展開才看得到完整的每一段
+      var affCount = (c.contact_affiliations || []).length;
+      var companyType = primaryCompany ? (primaryCompany.company_type || '客戶') : '';
+      var title = affiliationTitle(primary) || '—';
       var ownerName = c.owner ? c.owner.name : '—';
       var expanded = !!expandedContactIds[c.id];
       html += '<tr>' +
         '<td><button type="button" class="icon-btn" data-toggle-contact="' + c.id + '">' + (expanded ? '▾' : '▸') + '</button></td>' +
         '<td>' + escapeHtml(c.name_original || c.name_english || '—') + '</td>' +
-        '<td>' + escapeHtml(companyName) + '</td>' +
+        '<td>' + (primaryCompany ? escapeHtml(companyDisplayName(primaryCompany)) : '—') +
+          (affCount > 1 ? ' <span class="tag">＋' + (affCount - 1) + '</span>' : '') + '</td>' +
+        '<td>' + (primaryCompany ? '<span class="tag">' + escapeHtml(companyType) + '</span>' : '—') + '</td>' +
         '<td>' + escapeHtml(title) + '</td>' +
+        '<td>' + escapeHtml((primary && primary.responsibility) || '—') + '</td>' +
         '<td><span class="tag">' + escapeHtml(c.importance) + '</span></td>' +
         '<td class="num">' + (c.contact_score != null ? fmtNum(c.contact_score, 1) : '—') + '</td>' +
         '<td><span class="tag">' + escapeHtml(c.status) + '</span></td>' +
@@ -2676,6 +2966,20 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   function renderContactDetail(c){
+    var affs = c.contact_affiliations || [];
+    var affiliationsHtml = affs.length === 0
+      ? '<div style="padding:6px 0;color:var(--ink-faint);font-size:12.5px;">尚未填寫所屬單位</div>'
+      : '<table style="margin:0;"><thead><tr><th>單位</th><th>類型</th><th>部門</th><th>職稱</th><th>負責項目</th></tr></thead><tbody>' +
+        affs.map(function(a){
+          var dept = a.department_original || a.department_english || '—';
+          return '<tr><td>' + (a.company ? escapeHtml(companyDisplayName(a.company)) : '—') +
+              (a.is_primary ? ' <span class="tag">主要</span>' : '') + '</td>' +
+            '<td>' + (a.company ? '<span class="tag">' + escapeHtml(a.company.company_type || '客戶') + '</span>' : '—') + '</td>' +
+            '<td>' + escapeHtml(dept) + '</td>' +
+            '<td>' + escapeHtml(affiliationTitle(a) || '—') + '</td>' +
+            '<td>' + escapeHtml(a.responsibility || '—') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+
     var methodsHtml = (c.contact_methods && c.contact_methods.length)
       ? c.contact_methods.map(function(m){
           return '<span class="tag">' + escapeHtml(CONTACT_METHOD_LABELS[m.type]||m.type) + '：' + escapeHtml(m.value_original) + (m.is_primary ? ' ★' : '') + '</span>';
@@ -2733,6 +3037,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     ) : '';
 
     return '<div style="padding:12px 16px 16px 40px;">' +
+      '<div style="margin-bottom:10px;"><strong>所屬單位與職稱</strong>' + affiliationsHtml + '</div>' +
       '<div style="margin-bottom:10px;"><strong>聯絡方式：</strong> ' + methodsHtml + '</div>' +
       '<div style="margin-bottom:10px;"><strong>參展紀錄：</strong> ' + exhibitionsHtml + '</div>' +
       '<div class="sub-form-section" style="margin-top:12px;padding-top:12px;"><h4 class="sub-form-heading">聯繫紀錄</h4>' + interactionsHtml + addInteractionHtml + '</div>' +
@@ -2973,6 +3278,8 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     addItemRow();
     updateRateButtonState();
     updateExpenseTypeState();
+    clearAffiliationRows();
+    addAffiliationRow();
     clearContactMethodRows();
     addContactMethodRow();
     renderAvatarPreview();
