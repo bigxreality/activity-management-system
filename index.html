@@ -64,6 +64,19 @@
   .portal-card h3{font-family:var(--font-display);font-size:16px;margin:10px 0 4px;}
   .portal-card p{color:var(--ink-faint);font-size:12.5px;margin:0;}
   @media (max-width:700px){ .portal-grid{grid-template-columns:1fr;} }
+  /* 名片裁切 */
+  .crop-overlay{position:fixed;inset:0;background:rgba(11,18,26,.86);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+  .crop-overlay.show{display:flex;}
+  .crop-panel{background:var(--surface);border-radius:var(--radius);padding:18px;width:100%;max-width:560px;max-height:100%;overflow:auto;}
+  .crop-title{font-family:var(--font-display);font-size:15px;margin:0 0 6px;}
+  .crop-hint{color:var(--ink-faint);font-size:12px;margin:0 0 12px;line-height:1.5;}
+  .crop-stage{position:relative;background:#11181F;border-radius:var(--radius-sm);overflow:hidden;touch-action:none;display:flex;align-items:center;justify-content:center;}
+  .crop-stage canvas{display:block;touch-action:none;cursor:grab;}
+  .crop-stage canvas:active{cursor:grabbing;}
+  /* 白框只是視覺參考，實際裁切範圍等於整個 canvas */
+  .crop-frame{position:absolute;inset:0;border:2px solid rgba(255,255,255,.9);pointer-events:none;box-shadow:0 0 0 9999px rgba(11,18,26,.35) inset;}
+  .crop-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;}
+  .crop-actions-spacer{flex:1;}
   .status-dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:none;}
   .status-dot.ok{background:#3FBF8F;}
   .status-dot.err{background:var(--accent);}
@@ -779,6 +792,27 @@
 <div class="toast" id="toast"></div>
 <div class="loading-veil" id="loadingVeil">處理中...</div>
 
+<!-- ============ 名片裁切 ============ -->
+<div class="crop-overlay" id="cropOverlay">
+  <div class="crop-panel">
+    <h3 class="crop-title">調整名片範圍</h3>
+    <p class="crop-hint">把名片對齊白框：拖曳可移動，雙指可縮放（電腦用滑鼠拖曳、滾輪縮放）。框外的部分會被裁掉。</p>
+    <div class="crop-stage" id="cropStage">
+      <canvas id="cropCanvas"></canvas>
+      <div class="crop-frame"></div>
+    </div>
+    <div class="crop-actions">
+      <button type="button" class="btn btn-ghost btn-sm" id="cropOrientationBtn">直式／橫式</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="cropRotateBtn">旋轉 90°</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="cropResetBtn">重設</button>
+      <span class="crop-actions-spacer"></span>
+      <button type="button" class="btn btn-ghost btn-sm" id="cropFullBtn">用原圖不裁切</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="cropCancelBtn">取消</button>
+      <button type="button" class="btn btn-primary btn-sm" id="cropConfirmBtn">確定裁切</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -859,7 +893,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   var photoState = {
     avatar: { pendingFile: null, existingPath: null, removed: false }
   };
-  var cardScanState = { pendingFile: null, hash: null, businessCardId: null };
+  var cardScanState = { pendingFile: null, hash: null, businessCardId: null, imagePath: null };
 
   function fmtInt(n){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits:0}).format(Math.round(n||0)); }
   function fmtNum(n, dp){ return new Intl.NumberFormat('zh-TW', {maximumFractionDigits: dp==null?2:dp}).format(n||0); }
@@ -2172,6 +2206,222 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     return aff.title_original || aff.title_english || '';
   }
 
+  // ---------------- 名片裁切：手機只能直拍，靠這裡把名片以外的畫面裁掉 ----------------
+  // 名片標準尺寸 91×55mm，比例約 1.65:1
+  var CARD_ASPECT = 91 / 55;
+  var cropState = null;   // { img, scale, minScale, panX, panY, rotation, landscape }
+  var cropResolve = null; // confirm/cancel 時回傳結果給呼叫端
+
+  function openCropper(file){
+    return new Promise(function(resolve){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        URL.revokeObjectURL(url);
+        cropState = { img: img, scale: 1, minScale: 1, panX: 0, panY: 0, rotation: 0, landscape: true, sourceFile: file };
+        cropResolve = resolve;
+        document.getElementById('cropOverlay').classList.add('show');
+        layoutCropCanvas();
+        resetCropTransform();
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  function closeCropper(result){
+    document.getElementById('cropOverlay').classList.remove('show');
+    var done = cropResolve;
+    cropResolve = null;
+    cropState = null;
+    if(done) done(result);
+  }
+
+  // canvas 的顯示尺寸＝裁切框，寬度隨面板可用寬度縮放
+  function layoutCropCanvas(){
+    if(!cropState) return;
+    var canvas = document.getElementById('cropCanvas');
+    var stage = document.getElementById('cropStage');
+    var maxW = Math.max(200, stage.parentElement.clientWidth - 4);
+    var aspect = cropState.landscape ? CARD_ASPECT : (1 / CARD_ASPECT);
+    var w = maxW, h = Math.round(w / aspect);
+    var maxH = Math.round(window.innerHeight * 0.5);
+    if(h > maxH){ h = maxH; w = Math.round(h * aspect); }
+    var dpr = window.devicePixelRatio || 1;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    stage.style.width = w + 'px';
+    stage.style.height = h + 'px';
+  }
+
+  // 預設縮放到「剛好蓋滿裁切框」，使用者再自己微調
+  function resetCropTransform(){
+    if(!cropState) return;
+    var canvas = document.getElementById('cropCanvas');
+    var frameW = parseFloat(canvas.style.width), frameH = parseFloat(canvas.style.height);
+    var rotated = (cropState.rotation % 180) !== 0;
+    var effW = rotated ? cropState.img.height : cropState.img.width;
+    var effH = rotated ? cropState.img.width : cropState.img.height;
+    cropState.minScale = Math.max(frameW / effW, frameH / effH);
+    cropState.scale = cropState.minScale;
+    cropState.panX = 0;
+    cropState.panY = 0;
+    drawCrop();
+  }
+
+  function drawCrop(){
+    if(!cropState) return;
+    var canvas = document.getElementById('cropCanvas');
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    var frameW = parseFloat(canvas.style.width), frameH = parseFloat(canvas.style.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, frameW, frameH);
+    ctx.fillStyle = '#11181F';
+    ctx.fillRect(0, 0, frameW, frameH);
+    ctx.save();
+    ctx.translate(frameW / 2 + cropState.panX, frameH / 2 + cropState.panY);
+    ctx.rotate(cropState.rotation * Math.PI / 180);
+    ctx.scale(cropState.scale, cropState.scale);
+    ctx.drawImage(cropState.img, -cropState.img.width / 2, -cropState.img.height / 2);
+    ctx.restore();
+  }
+
+  // 拖曳平移 ＋ 雙指/滾輪縮放
+  var cropPointers = new Map();
+  var cropPinchStart = null;
+  (function setupCropGestures(){
+    var canvas = document.getElementById('cropCanvas');
+    canvas.addEventListener('pointerdown', function(ev){
+      if(!cropState) return;
+      canvas.setPointerCapture(ev.pointerId);
+      cropPointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if(cropPointers.size === 2){
+        var pts = Array.from(cropPointers.values());
+        cropPinchStart = {
+          dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+          scale: cropState.scale
+        };
+      }
+    });
+    canvas.addEventListener('pointermove', function(ev){
+      if(!cropState || !cropPointers.has(ev.pointerId)) return;
+      var prev = cropPointers.get(ev.pointerId);
+      cropPointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if(cropPointers.size === 1){
+        cropState.panX += ev.clientX - prev.x;
+        cropState.panY += ev.clientY - prev.y;
+        drawCrop();
+      } else if(cropPointers.size === 2 && cropPinchStart){
+        var pts = Array.from(cropPointers.values());
+        var dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if(cropPinchStart.dist > 0){
+          cropState.scale = clampCropScale(cropPinchStart.scale * (dist / cropPinchStart.dist));
+          drawCrop();
+        }
+      }
+    });
+    function endPointer(ev){
+      cropPointers.delete(ev.pointerId);
+      if(cropPointers.size < 2) cropPinchStart = null;
+    }
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('wheel', function(ev){
+      if(!cropState) return;
+      ev.preventDefault();
+      cropState.scale = clampCropScale(cropState.scale * (ev.deltaY < 0 ? 1.08 : 1 / 1.08));
+      drawCrop();
+    }, { passive: false });
+  })();
+
+  function clampCropScale(s){
+    var min = cropState.minScale * 0.5;   // 允許縮到比框小一點，四邊留白也可以接受
+    var max = cropState.minScale * 8;
+    return Math.min(max, Math.max(min, s));
+  }
+
+  document.getElementById('cropOrientationBtn').addEventListener('click', function(){
+    if(!cropState) return;
+    cropState.landscape = !cropState.landscape;
+    layoutCropCanvas();
+    resetCropTransform();
+  });
+  document.getElementById('cropRotateBtn').addEventListener('click', function(){
+    if(!cropState) return;
+    cropState.rotation = (cropState.rotation + 90) % 360;
+    resetCropTransform();
+  });
+  document.getElementById('cropResetBtn').addEventListener('click', resetCropTransform);
+  document.getElementById('cropCancelBtn').addEventListener('click', function(){ closeCropper(null); });
+  document.getElementById('cropFullBtn').addEventListener('click', function(){
+    var original = cropState ? cropState.sourceFile : null;
+    closeCropper({ useOriginal: true, file: original });
+  });
+  document.getElementById('cropConfirmBtn').addEventListener('click', function(){
+    if(!cropState) return;
+    exportCrop().then(function(file){ closeCropper({ file: file }); });
+  });
+  window.addEventListener('resize', function(){
+    if(!cropState) return;
+    layoutCropCanvas();
+    drawCrop();
+  });
+
+  // 輸出時用同一組變換，只是整體放大到輸出解析度（長邊 1600）
+  function exportCrop(){
+    return new Promise(function(resolve){
+      var canvas = document.getElementById('cropCanvas');
+      var frameW = parseFloat(canvas.style.width), frameH = parseFloat(canvas.style.height);
+      var outLong = 1600;
+      var ratio = frameW >= frameH ? (outLong / frameW) : (outLong / frameH);
+      var outW = Math.round(frameW * ratio), outH = Math.round(frameH * ratio);
+      var out = document.createElement('canvas');
+      out.width = outW; out.height = outH;
+      var ctx = out.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, outW, outH);
+      ctx.save();
+      ctx.translate(outW / 2 + cropState.panX * ratio, outH / 2 + cropState.panY * ratio);
+      ctx.rotate(cropState.rotation * Math.PI / 180);
+      ctx.scale(cropState.scale * ratio, cropState.scale * ratio);
+      ctx.drawImage(cropState.img, -cropState.img.width / 2, -cropState.img.height / 2);
+      ctx.restore();
+      var name = renameToWebp((cropState.sourceFile && cropState.sourceFile.name) || 'card');
+      out.toBlob(function(blob){
+        if(blob) resolve(new File([blob], name, { type: 'image/webp' }));
+        else resolve(cropState.sourceFile);
+      }, 'image/webp', 0.9);
+    });
+  }
+
+  // ---------------- 名片圖片的歸檔路徑 ----------------
+  // Storage 裡按「活動 / 單位」分資料夾，檔名用「姓名_公司名」，這樣直接在
+  // Supabase 後台瀏覽或另存都看得懂，不會是一堆亂碼。結尾接 8 碼雜湊避免同名蓋檔。
+  function sanitizePathSegment(s, fallback){
+    var out = String(s == null ? '' : s)
+      .replace(/[\/\\?%*:|"<>#]/g, '')          // 會被當成路徑分隔或 URL 語法的字元
+      .replace(/[\u0000-\u001f\u007f]/g, '')  // 控制字元
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 60);
+    return out || (fallback || '未命名');
+  }
+  function buildCardPath(name, company, exhibitionName, hash){
+    var eventFolder = sanitizePathSegment(exhibitionName, '未指定活動');
+    var companyFolder = sanitizePathSegment(company, '未指定公司');
+    var fileName = sanitizePathSegment(name, '未命名') + '_' + companyFolder + '_' + String(hash || '').slice(0, 8) + '.webp';
+    return 'business_cards/' + eventFolder + '/' + companyFolder + '/' + fileName;
+  }
+  function selectedSourceExhibitionName(){
+    var id = document.getElementById('c_source_exhibition').value;
+    if(!id) return '';
+    var ex = state.exhibitions.filter(function(e){ return e.id === id; })[0];
+    return ex ? ex.name : '';
+  }
+
   // ---------------- CRM：名片辨識（AI 自動預填聯絡人表單） ----------------
   function fileToBase64(file){
     return new Promise(function(resolve, reject){
@@ -2202,13 +2452,20 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
     ev.target.value = '';
     if(!file) return;
     var statusEl = document.getElementById('cardScanStatus');
+
+    // 手機只能直拍，照片上下常常帶到桌面等雜訊，先讓使用者把名片框出來
+    var cropResult = await openCropper(file);
+    if(!cropResult){ statusEl.textContent = '已取消'; return; }
+
     statusEl.textContent = '處理圖片中...';
-    var converted = await convertImageToWebp(file);
-    var buf = await converted.arrayBuffer();
+    // 裁切過的已經是 webp 了，只有選「用原圖不裁切」才需要再轉一次
+    var finalFile = cropResult.useOriginal ? await convertImageToWebp(cropResult.file) : cropResult.file;
+    var buf = await finalFile.arrayBuffer();
     var hash = await sha256Hex(buf);
-    cardScanState.pendingFile = converted;
+    cardScanState.pendingFile = finalFile;
     cardScanState.hash = hash;
     cardScanState.businessCardId = null;
+    cardScanState.imagePath = null;
     renderCardScanPreview();
     document.getElementById('cardScanRunBtn').disabled = false;
     statusEl.textContent = '已選好圖片，按「辨識名片」開始辨識';
@@ -2294,16 +2551,14 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       if(existingRes.error) throw existingRes.error;
       if(existingRes.data && existingRes.data.recognition_json){
         cardScanState.businessCardId = existingRes.data.id;
+        cardScanState.imagePath = existingRes.data.image_path || null;
         await fillContactFormFromCardScan(existingRes.data.recognition_json);
         statusEl.textContent = '這張名片之前掃描過，直接沿用上次的辨識結果（沒有重新呼叫 AI，不會重複計費）';
         return;
       }
 
-      statusEl.textContent = '上傳圖片中...';
-      var path = 'business_cards/' + cardScanState.hash + '.webp';
-      var uploadRes = await supabase.storage.from('photos').upload(path, cardScanState.pendingFile, { upsert: true });
-      if(uploadRes.error) throw new Error('名片圖片上傳失敗：' + uploadRes.error.message);
-
+      // 先辨識再上傳：辨識完才知道姓名與公司，檔案就能直接用看得懂的路徑歸檔，
+      // 不用先丟一個亂碼檔名再搬
       statusEl.textContent = 'AI 辨識中，請稍候...';
       var base64 = await fileToBase64(cardScanState.pendingFile);
       var sessionRes = await supabase.auth.getSession();
@@ -2315,6 +2570,15 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
       });
       var ocrData = await ocrRes.json();
       if(!ocrRes.ok || ocrData.error) throw new Error(ocrData.error || ('辨識服務回應錯誤 ' + ocrRes.status));
+
+      statusEl.textContent = '上傳圖片中...';
+      var exhibitionName = selectedSourceExhibitionName();
+      var ocrCompany = (ocrData.result && (ocrData.result.company_name_original || ocrData.result.company_name_english)) || '';
+      var ocrName = (ocrData.result && (ocrData.result.name_original || ocrData.result.name_english)) || '';
+      var path = buildCardPath(ocrName, ocrCompany, exhibitionName, cardScanState.hash);
+      var uploadRes = await supabase.storage.from('photos').upload(path, cardScanState.pendingFile, { upsert: true });
+      if(uploadRes.error) throw new Error('名片圖片上傳失敗：' + uploadRes.error.message);
+      cardScanState.imagePath = path;
 
       var insertRes = await supabase.from('business_cards').insert({
         image_path: path,
@@ -2340,7 +2604,7 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
   }
 
   function resetCardScanState(){
-    cardScanState = { pendingFile: null, hash: null, businessCardId: null };
+    cardScanState = { pendingFile: null, hash: null, businessCardId: null, imagePath: null };
     document.getElementById('cardScanRunBtn').disabled = true;
     document.getElementById('cardScanStatus').textContent = '';
     renderCardScanPreview();
@@ -2728,8 +2992,28 @@ const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
         if(ecRes.error) throw ecRes.error;
       }
 
+      // 名片圖片歸檔：使用者可能改了姓名/公司或補選了來源展覽，這時把檔案搬到
+      // 正確的資料夾與檔名，讓 Storage 裡看到的永遠是最後確認過的內容
       if(cardScanState.businessCardId){
-        await supabase.from('business_cards').update({ contact_id: contactId }).eq('id', cardScanState.businessCardId);
+        var cardUpdate = { contact_id: contactId, exhibition_id: sourceExhibitionId || null };
+        if(cardScanState.imagePath){
+          var primaryAff = affiliations.filter(function(a){ return a.is_primary; })[0] || affiliations[0];
+          var primaryCo = primaryAff && primaryAff.company_id
+            ? state.companies.filter(function(co){ return co.id === primaryAff.company_id; })[0]
+            : null;
+          var desiredPath = buildCardPath(
+            nameOriginal,
+            primaryCo ? (primaryCo.name_original || primaryCo.name_english) : '',
+            selectedSourceExhibitionName(),
+            cardScanState.hash
+          );
+          if(desiredPath !== cardScanState.imagePath){
+            var moveRes = await supabase.storage.from('photos').move(cardScanState.imagePath, desiredPath);
+            // 搬檔失敗不該讓整筆聯絡人存不進去，檔案留在原路徑也還是找得到
+            if(!moveRes.error) cardUpdate.image_path = desiredPath;
+          }
+        }
+        await supabase.from('business_cards').update(cardUpdate).eq('id', cardScanState.businessCardId);
       }
 
       toast(editingContactId ? '已更新聯絡人' : '已新增聯絡人');

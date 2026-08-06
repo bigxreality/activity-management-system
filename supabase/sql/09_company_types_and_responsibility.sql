@@ -24,6 +24,11 @@ alter table companies add column if not exists note text;
 alter table contacts add column if not exists responsibility text;
 
 -- ---------- 讓聯絡人分數 view 跟著帶新欄位 ----------
+-- 一定要先 drop 再建，不能用 create or replace：contacts 多了 responsibility 欄位之後，
+-- select c.* 展開的欄位順序會變，contact_score 被往後擠，而 create or replace view
+-- 不允許改變既有欄位的位置或名稱，會報 42P16 cannot change name of view column
+drop view if exists contacts_with_score;
+
 create or replace view contacts_with_score
 with (security_invoker = true) as
 select c.*,
