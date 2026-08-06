@@ -24,9 +24,20 @@ const corsHeaders = {
 };
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_MODEL = 'gemini-2.0-flash';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+// Google 會不定期調整哪些模型有免費額度（額度被拿掉時，回傳的錯誤是
+// 429 + limit: 0，等多久都不會恢復），所以這裡準備一份候選清單依序嘗試，
+// 遇到額度/找不到模型的錯誤就自動換下一個，不用改程式碼重新部署。
+// 想指定特定模型的話，設定 GEMINI_MODEL 這個 secret 就會優先使用它。
+const MODEL_CANDIDATES = [
+  Deno.env.get('GEMINI_MODEL'),
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+].filter(Boolean) as string[];
 
 // 用 responseSchema 強制 Gemini 回傳固定形狀的 JSON，比純靠 prompt 要求可靠很多。
 const RESPONSE_SCHEMA = {
@@ -109,34 +120,58 @@ Deno.serve(async (req: Request) => {
       return json({ error: '缺少圖片內容' }, 400);
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: PROMPT },
-                { inline_data: { mime_type: mimeType, data: imageBase64 } },
-              ],
-            },
+    const requestBody = JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: PROMPT },
+            { inline_data: { mime_type: mimeType, data: imageBase64 } },
           ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-          },
-        }),
-      }
-    );
+        },
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+      },
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return json({ error: `Gemini API 錯誤（${geminiRes.status}）：${errText}` }, 502);
+    let geminiData: any = null;
+    let usedModel = '';
+    const attempts: string[] = [];
+
+    for (const model of MODEL_CANDIDATES) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody,
+        }
+      );
+
+      if (res.ok) {
+        geminiData = await res.json();
+        usedModel = model;
+        break;
+      }
+
+      const errText = await res.text();
+      attempts.push(`${model} → ${res.status}`);
+      // 429（沒額度/超過速率）與 404（這個帳號用不到這個模型）都換下一個模型試試，
+      // 其他錯誤（例如金鑰錯誤 400/403）換模型也沒用，直接回報。
+      if (res.status !== 429 && res.status !== 404) {
+        return json({ error: `Gemini API 錯誤（${res.status}）：${errText}` }, 502);
+      }
     }
 
-    const geminiData = await geminiRes.json();
+    if (!geminiData) {
+      return json({
+        error: '所有可用的 Gemini 模型都沒有額度或無法使用（' + attempts.join('、') +
+          '）。可能是這組 API 金鑰所屬的 Google 專案沒有免費額度，' +
+          '請到 Google AI Studio 確認，或在 Edge Function 的 Secrets 設定 GEMINI_MODEL 指定其他模型。',
+      }, 502);
+    }
+
     const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     let parsed: unknown = null;
     try {
@@ -152,7 +187,7 @@ Deno.serve(async (req: Request) => {
     return json({
       result: parsed,
       raw_text: text,
-      ai_model: GEMINI_MODEL,
+      ai_model: usedModel,
       token_usage: usage.totalTokenCount ?? null,
     });
   } catch (err) {
