@@ -19,9 +19,11 @@
   兩個入口，使用者管理維持獨立可隨時進入
 - ✅ 名片 AI 掃描辨識（用 Google Gemini，拍照/上傳名片後自動預填聯絡人表單，
   名片上的公司會自動比對／自動建檔，同一張名片重複掃描會沿用上次結果、不重複計費）
-- ✅ 公司分類（客戶／供應商／媒體／合作夥伴）與產業類別，行銷可以用同一套系統
-  建立禮贈品、印刷、電視台、報社等供應商與媒體人脈；同一家公司的成員會歸類
-  在一起，展開公司即可看到人員清單與各自的負責項目
+- ✅ 公司分類（客戶／供應商／媒體／合作夥伴／社團組織）與產業類別，行銷可以用
+  同一套系統建立禮贈品、印刷、電視台、報社等供應商與媒體人脈；同一家公司的
+  成員會歸類在一起，展開公司即可看到人員清單與各自的負責項目
+- ✅ 一人多重身分：同一個聯絡人可以同時是 A 公司總經理、B 公司總裁、扶輪社社長，
+  每一段身分各自有自己的職稱、部門、負責項目
 - ⏳ 離線掃描佇列、重複聯絡人偵測、客戶自填表單、草稿暫存 — 下一階段
 - ⏳ 請款單／差旅報告單匯出 — 下一階段
 - ⏳ 整體改名與入口首頁、分析儀表板擴充 — 下一階段
@@ -58,6 +60,10 @@
 - `supabase/sql/09_company_types_and_responsibility.sql` — `companies` 新增類型
   （客戶／供應商／媒體／合作夥伴／其他）、產業類別、備註欄位，`contacts` 新增
   「負責項目／功能」欄位，讓 CRM 除了客戶之外也能管理供應商與媒體人脈。
+- `supabase/sql/10_contact_affiliations.sql` — 一人多重身分：新增
+  `contact_affiliations` 中間表（人 ↔ 單位多對多），職稱／部門／負責項目改成掛在
+  「這一段身分」上；公司類型多一個「社團組織」（扶輪社、獅子會等）。腳本會自動
+  把舊資料搬進新表，再移除 `contacts` 上的 `company_id`／職稱／部門欄位。
 - `supabase/functions/bot-rate/` — 台灣銀行歷史匯率查詢的 Supabase Edge Function，
   取代原本 Apps Script 的 `getBotRate`。
 - `supabase/functions/card-ocr/` — 名片辨識的 Supabase Edge Function，前端把名片
@@ -161,7 +167,14 @@ supabase functions deploy bot-rate
 3. 既有的公司資料會自動歸到「客戶」這個類型，之後可以在畫面上逐筆改成
    供應商／媒體／合作夥伴
 
-### 13. 部署 GitHub Pages
+### 13. 一人多重身分（人 ↔ 單位改成多對多）
+
+1. Supabase 後台左側「SQL Editor」
+2. 貼上 `supabase/sql/10_contact_affiliations.sql` 的全部內容，執行
+3. 腳本會自動把每個聯絡人現有的公司、職稱、部門搬進新的 `contact_affiliations`
+   表（標記為「主要身分」），再移除 `contacts` 上的舊欄位，不需要手動搬資料
+
+### 14. 部署 GitHub Pages
 
 1. 這個 repo 的「Settings」→ 左側選單「Pages」
 2. 「Build and deployment」→ Source 選「Deploy from a branch」
